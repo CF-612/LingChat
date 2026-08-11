@@ -25,12 +25,17 @@ import Notification from './components/ui/Notification.vue'
 import AchievementToast from './components/ui/AchievementToast.vue'
 import AdventureUnlockNotify from './components/ui/AdventureUnlockNotify.vue'
 import AppDialog from './components/ui/AppDialog.vue'
-import { initUIStore } from './stores/modules/ui/ui'
+import { initUIStore, useUIStore, setSuppressSessionPersist } from './stores/modules/ui/ui'
 import { i18n } from './locales'
 import { useSettingsStore } from './stores/modules/settings'
 import { useLlmProvidersStore } from './stores/modules/llm-providers'
 import { useAchievementStore } from './stores/modules/ui/achievement'
 import { useDialogStore } from './stores/modules/ui/dialog'
+import { useGameStore } from './stores/modules/game'
+import { applyWebInitData } from './stores/modules/game/actions'
+import { getGameInfo } from './api/services/game-info'
+import { eventQueue } from './core/events/event-queue'
+import { useMainWindowState } from './composables/useWindowState'
 import { useSedentaryReminder } from './composables/useSedentaryReminder'
 import { useUpdater } from './composables/useUpdater'
 import { useCanDeliver } from './composables/useCanDeliver'
@@ -74,6 +79,10 @@ const route = useRoute()
 
 // 仅主窗口挂载全局弹窗（通知/成就/对话确认），日志窗口等复用 App.vue 的窗口不弹
 const isMainWindow = getCurrentWindow().label === 'main'
+const uiStore = useUIStore()
+const gameStore = useGameStore()
+// 主窗口持久化尺寸/位置（日志/设置等窗口不参与）
+if (isMainWindow) useMainWindowState()
 
 const handleKeyDown = async (event: KeyboardEvent) => {
   if (event.key === 'F11') {
@@ -101,6 +110,7 @@ let saveCompleted = false
 let userConfirmedExit = false
 let unlistenCloseReady: (() => void) | null = null
 let unlistenCloseRequested: (() => void) | null = null
+let unlistenPetMode: (() => void) | null = null
 
 // 处理退出：两个条件都满足时调用 Rust exit_app
 function tryExit() {
@@ -167,12 +177,36 @@ onMounted(async () => {
       tryExit()
     },
   )
+
+  // 3. 桌宠模式切换：main 隐藏时暂停音频、恢复时从后端重载状态
+  if (isMainWindow) {
+    unlistenPetMode = await listen('pet-mode-changed', async (event) => {
+      const active = (event.payload as { active?: boolean } | null)?.active ?? false
+      if (active) {
+        // main 即将隐藏：暂停 BGM/环境音。窗口级操作，抑制持久化以免覆盖用户播放偏好
+        setSuppressSessionPersist(true)
+        uiStore.bgMusicPaused = true
+        uiStore.ambientTracks = uiStore.ambientTracks.map((t) => ({ ...t, paused: true }))
+        setSuppressSessionPersist(false)
+      } else {
+        // main 恢复：恢复事件队列，并从后端重新加载最新状态（含 pet 期间对话）
+        eventQueue.resume()
+        try {
+          const gameInfo = await getGameInfo()
+          applyWebInitData(gameStore, gameInfo)
+        } catch (e) {
+          console.error('[App] 桌宠退出后重载状态失败:', e)
+        }
+      }
+    })
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   if (unlistenCloseReady) unlistenCloseReady()
   if (unlistenCloseRequested) unlistenCloseRequested()
+  if (unlistenPetMode) unlistenPetMode()
 })
 </script>
 

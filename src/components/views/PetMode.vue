@@ -52,7 +52,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -62,6 +61,7 @@ import { useSettingsStore } from '@/stores/modules/settings'
 import { useUIStore } from '@/stores/modules/ui/ui'
 import { eventQueue } from '@/core/events/event-queue'
 import { useFileDrop } from '../pet/useFileDrop'
+import { usePetWindowState } from '@/composables/useWindowState'
 
 import PetNotification from '../pet/PetNotification.vue'
 import ChatInput from '../pet/ChatInput.vue'
@@ -71,10 +71,12 @@ import DragArea from '../pet/DragArea.vue'
 import { BASE_AVATAR_SIZE, CHAT_BASE_H, DIALOG_MAX_BASE } from '../pet/constants'
 
 const { t } = useI18n()
-const router = useRouter()
 const gameStore = useGameStore()
 const settingsStore = useSettingsStore()
 const uiStore = useUIStore()
+
+// 拖动桌宠后实时保存窗口位置（供下次 enter_pet 恢复）
+usePetWindowState()
 
 const showChatInput = ref(false)
 const { isDragging , hasFile } = useFileDrop()
@@ -107,7 +109,9 @@ const calcWindowLayout = (scale: number): { width: number; height: number } => {
 const applyWindowLayout = async () => {
   try {
     const scale = settingsStore.pet?.scale || 1.0
-    await invoke('set_pet_mode', { enable: true, scale })
+    // 独立窗口已由 enter_pet 建好；scale 变化时复用 enter_pet 的
+    // 「已存在窗口 → set_size」防御路径改尺寸，不传位置以免移动窗口
+    await invoke('enter_pet', { scale, position: null })
   } catch (error) {
     console.error('调整窗口布局失败:', error)
   }
@@ -158,10 +162,20 @@ onMounted(async () => {
   document.body.style.backgroundColor = 'transparent'
   document.documentElement.style.backgroundColor = 'transparent'
 
-  // 1. 初始化窗口为桌宠尺寸
-  await applyWindowLayout()
+  // 1. 从后端恢复对话状态（dialogHistory/角色/BGM 等，后端是唯一状态源）。
+  //    窗口已由 Rust enter_pet 就绪，无需再调整布局。
+  if (!gameStore.initialized) {
+    try {
+      await gameStore.initializeGame()
+    } catch (error) {
+      console.error('[PetMode] 初始化游戏失败:', error)
+      uiStore.showWarning({ title: '初始化失败', message: '请尝试重新进入自由对话' })
+    }
+  }
+  // 2. 恢复事件队列消费（pet 窗口是独立 JS 实例，初始为暂停）
+  eventQueue.resume()
 
-  // 2. 启动 100ms 一次的 solid bounds 测试
+  // 3. 启动 100ms 一次的 solid bounds 测试
   hitTestInterval = window.setInterval(() => {
     const rects = []
 
@@ -221,6 +235,9 @@ onUnmounted(() => {
   // 恢复默认背景色
   document.body.style.backgroundColor = ''
   document.documentElement.style.backgroundColor = ''
+
+  // 销毁 webview 前清理事件队列（pet 窗口即将 close，避免遗留状态）
+  eventQueue.clear()
 
   if (scaleUnlisten) scaleUnlisten()
   if (effectUnlisten) effectUnlisten()
@@ -359,7 +376,14 @@ const handleSwitchAutoMode = () => {
 }
 
 const handleExitPetMode = async () => {
-  // 关闭设置窗口（如果打开的话）
+  // 1. 强制落盘 pet 期间的对话（dialogHistory 纯内存，需在销毁 webview 前存档）
+  try {
+    await invoke('force_auto_save')
+  } catch (error) {
+    console.warn('退出桌宠保存失败:', error)
+  }
+
+  // 2. 关闭设置窗口（如果打开的话）
   try {
     const settingsWindow = await WebviewWindow.getByLabel('settings')
     if (settingsWindow) {
@@ -369,12 +393,10 @@ const handleExitPetMode = async () => {
     // 窗口不存在，忽略
   }
 
-  // 退出时清除 solid region，防止残留
+  // 3. 清除 solid region，防止残留
   await invoke('update_solid_regions', { rects: [] })
-  // 1. 关闭桌宠窗口特性，恢复 1500x800 的正常主窗口
-  await invoke('set_pet_mode', { enable: false })
-  // 2. 路由导航回聊天主页面
-  router.push('/chat')
+  // 4. 关闭 pet 窗口、恢复 main（main 窗口一直在，无需路由跳转）
+  await invoke('exit_pet')
 }
 </script>
 

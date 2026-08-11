@@ -53,11 +53,49 @@ function isStalePreviewReply(payload: Record<string, unknown>): boolean {
   return !store.previewing || store.previewGeneration !== gen
 }
 
+/**
+ * 当前窗口是否处于"活动"状态。
+ *
+ * 拆出独立桌宠窗口后，后端 AI/剧本事件走 `app.emit` 全局广播，main 与 pet 都会收到。
+ * 只有活动窗口才消费这些事件，否则会出现双份处理（对话重复、TTS 双播、BGM 双份）。
+ * 窗口隐藏/恢复由 Rust 通过 `pet-mode-changed` 通知。
+ */
+let isWindowActive = false
+
+/**
+ * 按窗口 label 初始化活动状态，并（仅在 main 窗口）监听桌宠模式切换事件。
+ * 所有窗口的 main.ts 都会执行。
+ */
+export function initializeWindowActivity() {
+  const label = getCurrentWindow().label
+
+  if (label === 'main') {
+    // main 窗口：初始活动；桌宠模式下隐藏 → 暂停
+    isWindowActive = true
+    listen('pet-mode-changed', (event) => {
+      const active = (event.payload as { active?: boolean } | null)?.active ?? false
+      isWindowActive = !active
+      if (active) {
+        // 桌宠激活：清空并暂停 main 的事件队列，避免积压
+        eventQueue.clear()
+      } else {
+        // main 恢复：恢复队列消费
+        eventQueue.resume()
+      }
+    })
+  } else if (label === 'pet') {
+    // pet 窗口：一创建即活动
+    isWindowActive = true
+  }
+  // log / settings 等辅助窗口保持不活动，不消费 AI 事件
+}
+
 export function initializeTauriEventListeners() {
   const currentWindow = getCurrentWindow()
   const mainWindow = currentWindow.label === 'main' ? currentWindow : null
 
   listen('ai:reply', (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as Record<string, unknown>
     // 试玩中止后迟到的流式回复：直接丢弃，不放进事件队列
     if (isStalePreviewReply(payload)) return
@@ -66,6 +104,7 @@ export function initializeTauriEventListeners() {
   })
 
   listen('ai:thinking', (event) => {
+    if (!isWindowActive) return
     console.log('[Tauri] ai:thinking', event.payload)
     eventQueue.addEvent(asEvent(event.payload, { type: 'thinking', defaultDuration: 0 }))
   })
@@ -80,6 +119,7 @@ export function initializeTauriEventListeners() {
   })
 
   listen('ai:error', (event) => {
+    if (!isWindowActive) return
     const p = event.payload as Record<string, unknown>
     console.log('[Tauri] ai:error', p)
     interruptToolActivities()
@@ -93,22 +133,26 @@ export function initializeTauriEventListeners() {
 
   // 工具执行生命周期：驱动自由对话顶栏的实时状态，不写入历史记录。
   listen('ai:tool_activity', (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as ToolActivityEvent
     handleToolActivity(payload)
   })
 
   // 工具调用参数流式生成进度：顶栏实时显示「正在生成…N 字」
   listen('ai:tool_call_progress', (event) => {
+    if (!isWindowActive) return
     handleToolCallProgress(event.payload as { tool: string; chars: number })
   })
 
   // 一轮 LLM 流结束：清除「正在生成」进度提示（工具被忽略的收尾轮不会再有执行事件）
   listen('ai:tool_call_progress_end', () => {
+    if (!isWindowActive) return
     clearToolCallPreparing()
   })
 
   // 工具调用结果：记入「工具调用」页面历史 + 左上角弹通知
   listen('ai:tool_call', (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as {
       tool: string
       ok: boolean
@@ -145,6 +189,8 @@ export function initializeTauriEventListeners() {
   // 审批框只在主窗口挂载；独立日志窗口等不能消费审批事件。
   // 主聊天 execute_command 审批：弹确认框，把用户决定回传给等待中的工具
   mainWindow?.listen('chat:command_approval', async (event) => {
+    // 桌宠模式下 main 隐藏，审批弹窗不可见，直接跳过（Rust 侧 120s 超时自动拒绝）
+    if (!isWindowActive) return
     const payload = event.payload as {
       request_id: string
       command: string
@@ -170,6 +216,7 @@ export function initializeTauriEventListeners() {
 
   // execute_command 中识别到删除操作时使用独立危险确认；回传到删除审批队列。
   mainWindow?.listen('chat:command_delete_approval', async (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as {
       request_id: string
       command: string
@@ -198,6 +245,7 @@ export function initializeTauriEventListeners() {
 
   // 主聊天 delete_file 审批：先显示后端解析并校验过的真实路径，再把决定回传给工具。
   mainWindow?.listen('chat:file_delete_approval', async (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as {
       request_id: string
       path: string
@@ -218,6 +266,7 @@ export function initializeTauriEventListeners() {
   })
 
   listen('status:reset', (event) => {
+    if (!isWindowActive) return
     console.log('[Tauri] status:reset', event.payload)
     eventQueue.addEvent(asEvent(event.payload, { type: 'status_reset', defaultDuration: 0 }))
   })
@@ -267,6 +316,8 @@ export function initializeTauriEventListeners() {
   // === Auto-save events ===
 
   listen('save:auto-saved', async (event) => {
+    // 仅活动窗口处理，避免 main 与 pet 双份截图/弹通知
+    if (!isWindowActive) return
     const payload = event.payload as { save_id: number; title: string; timestamp: string }
     console.log('[Tauri] save:auto-saved', payload)
 
@@ -296,55 +347,68 @@ export function initializeTauriEventListeners() {
   // === Script events ===
 
   listen('script:narration', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'narration', defaultDuration: -1 }))
   })
 
   listen('script:player', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'player', defaultDuration: -1 }))
   })
 
   listen('script:chapter-change', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'chapter_change', defaultDuration: 0 }))
   })
 
   listen('script:background', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'background', defaultDuration: 0 }))
   })
 
   listen('script:background-effect', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'background_effect', defaultDuration: 0 }))
   })
 
   listen('script:music', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'music', defaultDuration: 0 }))
   })
 
   listen('script:sound', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'sound', defaultDuration: 0 }))
   })
 
   // 环境音事件（多轨并行，与BGM共存）
   listen('script:ambient', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'ambient', defaultDuration: 0 }))
   })
 
   listen('script:present-pic', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'present_pic', defaultDuration: -1 }))
   })
 
   listen('script:modify-character', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'modify_character', defaultDuration: 0 }))
   })
 
   listen('script:input', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'input', defaultDuration: 0 }))
   })
 
   listen('script:choice', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'choice', defaultDuration: 0 }))
   })
 
   listen('script:end', (event) => {
+    if (!isWindowActive) return
     console.log('[Tauri] script:end', event.payload)
     eventQueue.addEvent(
       asEvent(event.payload, { type: 'script_end', defaultDuration: 0, isFinal: true }),
@@ -352,12 +416,14 @@ export function initializeTauriEventListeners() {
   })
 
   listen('script:free-dialogue', (event) => {
+    if (!isWindowActive) return
     eventQueue.addEvent(asEvent(event.payload, { type: 'free_dialogue', defaultDuration: 0 }))
   })
 
   // === God Agent multi-dialogue event ===
 
   listen('character:switch', async (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as { type: string; roleId: number; characterName: string }
     console.log('[Tauri] character:switch', payload)
     const gameStore = useGameStore()
@@ -378,6 +444,7 @@ export function initializeTauriEventListeners() {
   // === LLM 场景工具事件 ===
 
   listen('scene:switch', (event) => {
+    if (!isWindowActive) return
     const payload = event.payload as { type: string; scene: SceneInfo }
     console.log('[Tauri] scene:switch', payload)
     const gameStore = useGameStore()

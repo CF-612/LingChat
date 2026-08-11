@@ -50,11 +50,13 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { invoke } from '@tauri-apps/api/core'
 import FreeModeTools from '@/components/tools/FreeModeTools.vue'
 import ToolActivityStatus from '@/components/tools/ToolActivityStatus.vue'
 import { useUIStore } from '../../stores/modules/ui/ui'
 import { useGameStore } from '../../stores/modules/game'
+import { useSettingsStore } from '../../stores/modules/settings'
+import { readLocalStorage, PET_WINDOW_KEY } from '@/composables/useWindowState'
 import { GameBackground, GameRolesStage } from '../game/standard'
 import { GameDialog } from '../game/standard'
 import { Button } from '../base'
@@ -71,9 +73,9 @@ const LOADING_STORAGE_KEY = 'lingchat_loading_shown'
 // 用模块级变量兜底，确保一次启动只播放一次。
 let loadingShownThisSession = false
 
-const router = useRouter()
 const uiStore = useUIStore()
 const gameStore = useGameStore()
+const settingsStore = useSettingsStore()
 
 // 首次加载过渡状态：仅当本次 session 未播放过且 localStorage 未标记时播放
 const showLoading = ref(!loadingShownThisSession && !localStorage.getItem(LOADING_STORAGE_KEY))
@@ -86,8 +88,19 @@ function onLoadingComplete() {
   eventQueue.resume()
 }
 
-const goToPetMode = () => {
-  router.push('/pet')
+const goToPetMode = async () => {
+  const scale = settingsStore.pet?.scale || 1.0
+  // 恢复上次桌宠位置（若已保存），免闪烁
+  const savedPos = readLocalStorage<{ x: number; y: number }>(PET_WINDOW_KEY)
+  const position =
+    savedPos && typeof savedPos.x === 'number' && typeof savedPos.y === 'number'
+      ? [savedPos.x, savedPos.y]
+      : null
+  try {
+    await invoke('enter_pet', { scale, position })
+  } catch (error) {
+    console.error('进入桌宠模式失败:', error)
+  }
 }
 
 const gameDialogRef = ref<InstanceType<typeof GameDialog> | null>(null)

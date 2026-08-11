@@ -395,9 +395,18 @@ pub async fn save_screenshot(save_id: i32, screenshot_path: String) -> Result<()
 #[cfg(target_os = "windows")]
 #[tauri::command]
 pub async fn capture_main_window_screenshot(app: AppHandle) -> Result<String, String> {
+    // 桌宠模式下 main 隐藏，改截当前活动窗口（pet）；main 不可用时降级报错
+    let label = {
+        let active = app.state::<crate::api::pet::ActiveWindow>();
+        if let Ok(l) = active.label.lock() {
+            l.clone()
+        } else {
+            "main".to_string()
+        }
+    };
     let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| "main window not found".to_string())?;
+        .get_webview_window(&label)
+        .ok_or_else(|| format!("窗口 {} not found", label))?;
 
     let hwnd = window
         .hwnd()

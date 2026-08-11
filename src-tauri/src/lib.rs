@@ -248,6 +248,8 @@ pub fn run() {
 
             // 管理各种状态
             app.manage(api::pet::HitTestState::default());
+            // 当前活动窗口标签（main / pet），穿透轮询/截图等按它取窗口
+            app.manage(api::pet::ActiveWindow::default());
             app.manage(resource_sync::ResourceSyncState::default());
             app.manage(lan_sync::LanSyncState::default());
             app.manage(utils::cpu_perf::CpuDetectionCache::new());
@@ -464,6 +466,8 @@ pub fn run() {
 
             #[cfg(target_os = "windows")]
             {
+                let app_for_poll = app.handle().clone();
+                let active_win_arc = app.state::<api::pet::ActiveWindow>().label.clone();
                 tauri::async_runtime::spawn(async move {
                     let mut was_ignored = false;
                     loop {
@@ -475,13 +479,28 @@ pub fn run() {
                             false
                         };
 
+                        // 穿透只在桌宠模式启用；关闭时若窗口仍被忽略光标则还原
                         if !enabled {
                             if was_ignored {
-                                let _ = window.set_ignore_cursor_events(false);
+                                if let Some(main) = app_for_poll.get_webview_window("main") {
+                                    let _ = main.set_ignore_cursor_events(false);
+                                }
                                 was_ignored = false;
                             }
                             continue;
                         }
+
+                        // 取当前活动窗口（桌宠模式为 pet，普通模式为 main）
+                        let label = {
+                            if let Ok(l) = active_win_arc.lock() {
+                                l.clone()
+                            } else {
+                                "main".to_string()
+                            }
+                        };
+                        let Some(window) = app_for_poll.get_webview_window(&label) else {
+                            continue;
+                        };
 
                         use windows::Win32::Foundation::POINT;
                         use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
@@ -667,7 +686,9 @@ pub fn run() {
             api::script_editor::agent::editor_agent_stop_chat,
             api::script_editor::agent::editor_agent_resolve_approval,
             api::pet::update_solid_regions,
-            api::pet::set_pet_mode,
+            api::pet::enter_pet,
+            api::pet::exit_pet,
+            api::pet::force_auto_save,
             api::schedule::get_schedules,
             api::schedule::save_schedules,
             api::schedule::reload_proactive_system,

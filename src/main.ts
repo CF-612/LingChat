@@ -1,7 +1,10 @@
 import { createApp } from "vue";
 import pinia from "./stores";
 import { initializeEventProcessors } from "./core/events";
-import { initializeTauriEventListeners } from "./api/tauri-events";
+import {
+  initializeTauriEventListeners,
+  initializeWindowActivity,
+} from "./api/tauri-events";
 
 import App from "./App.vue";
 import "./assets/styles/base.css";
@@ -26,14 +29,20 @@ const app = createApp(App);
 
 initializeEventProcessors();
 initializeTauriEventListeners();
+// 按窗口 label 初始化活动状态（main/pet 活动，log/settings 等不消费 AI 事件）
+initializeWindowActivity();
 
 app.use(pinia);
 app.use(i18n);
 app.use(router);
 
 // 独立日志窗口：通过 index.html?window=log 打开时直接进入日志路由
-if (new URLSearchParams(window.location.search).get('window') === 'log') {
+// 独立桌宠窗口：通过 index.html?window=pet 打开时直接进入桌宠路由
+const queryWindow = new URLSearchParams(window.location.search).get('window')
+if (queryWindow === 'log') {
   router.replace('/log-window');
+} else if (queryWindow === 'pet') {
+  router.replace('/pet');
 }
 
 app.mount("#app");

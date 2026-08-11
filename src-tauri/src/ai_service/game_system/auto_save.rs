@@ -190,7 +190,7 @@ impl AutoSaveManager {
     }
 
     /// Exit save: force a save regardless of change detection.
-    async fn perform_exit_save(&mut self) -> Result<(), String> {
+    pub async fn perform_exit_save(&mut self) -> Result<(), String> {
         // Reset hash to force save even if nothing changed
         self.last_saved_hash = None;
         self.perform_save().await

@@ -557,6 +557,7 @@ export const useUIStore = defineStore('ui', {
 
     /** 持久化 BGM 状态（防抖 500ms），由 $subscribe 自动触发 */
     persistBgmState() {
+      if (suppressSessionPersist) return
       if (bgmSaveTimer) clearTimeout(bgmSaveTimer)
       bgmSaveTimer = setTimeout(() => {
         saveBgmState(this.currentBackgroundMusic, this.bgMusicPaused, this.bgMusicMode)
@@ -565,6 +566,7 @@ export const useUIStore = defineStore('ui', {
 
     /** 持久化环境音轨道（防抖 500ms），由 $subscribe 自动触发 */
     persistAmbientState() {
+      if (suppressSessionPersist) return
       if (ambientSaveTimer) clearTimeout(ambientSaveTimer)
       ambientSaveTimer = setTimeout(() => {
         saveAmbientState(JSON.stringify(this.ambientTracks))
@@ -579,6 +581,13 @@ let initialized = false
 // 防抖定时器（模块级，避免污染 store state）
 let bgmSaveTimer: ReturnType<typeof setTimeout> | null = null
 let ambientSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+// 桌宠模式窗口级暂停 BGM/环境音时置 true，禁止该次变更持久化到后端。
+// 这类暂停/恢复属于窗口切换的副作用，不应覆盖用户的真实播放偏好。
+let suppressSessionPersist = false
+export function setSuppressSessionPersist(v: boolean) {
+  suppressSessionPersist = v
+}
 
 // 初始化函数：在首次使用时调用
 export function initUIStore() {
