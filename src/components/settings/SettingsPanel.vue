@@ -5,22 +5,24 @@
       <SettingsNav ref="settingsNavRef" @remove-more-menu-from-a="onAddFromA" />
     </div>
 
-    <div class="w-full flex-1 overflow-auto">
-      <SettingsSave v-show="uiStore.currentSettingsTab === 'save'" />
-      <SettingsText v-show="uiStore.currentSettingsTab === 'text'" />
-      <SettingsSound v-show="uiStore.currentSettingsTab === 'sound'" />
-      <SettingsAdvance
-        ref="settingsAdvanceRef"
-        v-show="uiStore.currentSettingsTab === 'advance'"
-        @remove-more-menu-from-b="onAddFromB"
-      />
-      <SettingsAdventure v-show="uiStore.currentSettingsTab === 'adventure'" />
-      <SettingsHistory v-show="uiStore.currentSettingsTab === 'history'" />
-      <SettingsAchievement v-show="uiStore.currentSettingsTab === 'achievement'" />
-      <SettingsCharacter v-show="uiStore.currentSettingsTab === 'character'" />
-      <SettingsBackground v-show="uiStore.currentSettingsTab === 'background'" />
-      <SettingsLog v-show="uiStore.currentSettingsTab === 'log'" />
-      <SettingsWorkshop v-show="uiStore.currentSettingsTab === 'workshop'" />
+    <div
+      class="w-full flex-1 relative overflow-hidden"
+      ref="contentRef"
+      @touchstart="onTouchStart"
+      @touchend="onTouchEnd"
+    >
+      <Transition :name="transitionName">
+        <!-- KeepAlive 缓存设置子页面实例：切换时只激活/停用，不销毁重建，保留状态 -->
+        <KeepAlive>
+          <component
+            :is="currentTabComponent"
+            :key="uiStore.currentSettingsTab"
+            class="absolute inset-0 overflow-y-auto"
+            ref="settingsAdvanceRef"
+            @remove-more-menu-from-b="onAddFromB"
+          />
+        </KeepAlive>
+      </Transition>
     </div>
   </div>
 </template>
@@ -37,11 +39,12 @@ import {
   SettingsAchievement,
   SettingsAdventure,
   SettingsLog,
-  SettingsWorkshop,
+  SettingsPlugins,
 } from './pages'
 import SettingsNav from './SettingsNav.vue'
 import { useUIStore } from '../../stores/modules/ui/ui'
-import { ref, watch } from 'vue'
+import { ref, watch, computed, type Component } from 'vue'
+import { isAndroid } from '@/utils/platform'
 
 const uiStore = useUIStore()
 
@@ -73,73 +76,168 @@ watch(
   { immediate: true },
 )
 
-// 2. 定义事件处理函数
-// 当 A 组件发来 "remove-more-menu-from-a" 事件时
-const onAddFromA = () => {
-  // console.log('父组件收到 A 的添加事件，准备通知 B 组件');
-  // 调用 B 组件实例上暴露的 removeMoreMenu 方法
-  settingsAdvanceRef.value?.addMoreMenu()
+// ========== 手机端左右滑动切换标签 ==========
+// 导航栏在顶部，手机端通过水平滑动内容区切换设置页
+// 标签顺序与 SettingsNav 导航一致
+const TABS = [
+  'character',
+  'adventure',
+  'text',
+  'background',
+  'sound',
+  'history',
+  'achievement',
+  'save',
+  'advance',
+  'log',
+  // 插件系统由 RustPython 驱动，移动端不编译（cfg(desktop)），Android 上不显示该 tab
+  ...(isAndroid() ? [] : ['plugins']),
+] as const
+
+// 标签 → 组件映射（推入推出转场用 v-if 动态组件）
+const tabComponents: Record<string, Component> = {
+  save: SettingsSave,
+  text: SettingsText,
+  sound: SettingsSound,
+  advance: SettingsAdvance,
+  adventure: SettingsAdventure,
+  history: SettingsHistory,
+  achievement: SettingsAchievement,
+  character: SettingsCharacter,
+  background: SettingsBackground,
+  log: SettingsLog,
+  plugins: SettingsPlugins,
+}
+const currentTabComponent = computed(() => tabComponents[uiStore.currentSettingsTab])
+// 转场方向：左滑下一项 → slide-left（新页从右进）；右滑上一项 → slide-right
+const transitionName = ref<'slide-left' | 'slide-right'>('slide-left')
+
+const contentRef = ref<HTMLElement | null>(null)
+let touchStartX = 0
+let touchStartY = 0
+let touchOnHorizontalScrollable = false
+let isSwipeAnimating = false
+
+// 判断触摸起点是否在"可滚动"容器内（纵向列表如存档/日志、横向表格等）。
+// 是则不触发页面切换——用户可能在拖动内容或滚动条，不该切页。
+// 只排除"确实有溢出可滚"的容器：内容不满的页面（无可滚动区域）仍可滑动切换。
+function isInsideScrollable(el: Element | null): boolean {
+  while (el && el !== contentRef.value) {
+    // 数值调节滑块（原生 range / 自定义 Slider）→ 拖动它不该切页
+    if (el.tagName === 'INPUT' && (el as HTMLInputElement).type === 'range') return true
+    // 横向可滚动容器（如日志页横向表格）→ 拖动横向内容不该切页。
+    // 竖向滚动容器不在此列：竖向滚动由 onTouchEnd 的 |dx| <= |dy| 判断兜底，
+    // 竖向列表里做"明显横向"滑动仍可切页。
+    const s = getComputedStyle(el)
+    if (
+      (s.overflowX === 'auto' || s.overflowX === 'scroll') &&
+      el.scrollWidth > el.clientWidth + 4
+    ) {
+      return true
+    }
+    el = el.parentElement
+  }
+  return false
 }
 
-// 当 B 组件发来 "remove-more-menu-from-b" 事件时
-const onAddFromB = () => {
-  // console.log('父组件收到 B 的添加事件，准备通知 A 组件');
-  // 调用 A 组件实例上暴露的 removeMoreMenu 方法
-  settingsNavRef.value?.addMoreMenu()
+const onTouchStart = (e: TouchEvent) => {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+  touchOnHorizontalScrollable = isInsideScrollable(e.target as Element)
 }
+
+const onTouchEnd = (e: TouchEvent) => {
+  // 仅小屏（手机）生效
+  if (!uiStore.isSmallScreen) return
+  // 起点在可横向滚动区域（日志页等）→ 让原生滚动处理
+  if (touchOnHorizontalScrollable) return
+  if (isSwipeAnimating) return
+
+  const dx = e.changedTouches[0].clientX - touchStartX
+  const dy = e.changedTouches[0].clientY - touchStartY
+
+  // 只响应明显的水平滑动（避免和垂直滚动/滑块冲突）
+  if (Math.abs(dx) < 50 || Math.abs(dx) <= Math.abs(dy)) return
+
+  const currentIdx = TABS.indexOf(uiStore.currentSettingsTab as (typeof TABS)[number])
+  let nextIdx = dx < 0 ? currentIdx + 1 : currentIdx - 1 // 左滑 → 下一个，右滑 → 上一个
+  if (nextIdx < 0) nextIdx = TABS.length - 1
+  if (nextIdx >= TABS.length) nextIdx = 0
+
+  isSwipeAnimating = true
+  uiStore.setSettingsTab(TABS[nextIdx])
+  setTimeout(() => {
+    isSwipeAnimating = false
+  }, 300)
+}
+
+// 提供给 SettingsAdvance 的对外暴露接口（示例）
+const onAddFromA = () => {
+  // A 组件转发的事件处理
+}
+
+const onAddFromB = () => {
+  // B 组件转发的事件处理
+}
+
+// 在父组件中暴露引用（如需要）
+defineExpose({
+  settingsNavRef,
+  settingsAdvanceRef,
+})
 </script>
 
-<style>
-.header {
-  display: flex;
-  align-items: center;
-  padding: 10px 15px;
-  position: relative;
-  justify-content: space-between;
-  /* background: rgba(0, 0, 0, 0.2); */
+<style scoped>
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999;
+  transition: opacity 0.3s ease;
+  opacity: 0;
 }
 
 .settings-panel {
   position: fixed;
   top: 0;
-  right: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 1;
-  padding: 0;
-  box-sizing: border-box;
-  z-index: 1000;
-  color: #333;
-  /* background-color: rgba(0, 0, 0, 0.25); */
-  background-color: transparent;
-}
-
-.container {
-  height: 90%;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent-color) transparent;
-  position: relative;
-  -ms-overflow-style: -ms-autohiding-scrollbar;
-}
-
-.blur-overlay {
-  position: fixed;
-  top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: var(--bg-primary, #1a1a2e);
+  color: var(--text-primary, #fff);
+}
 
-  /* 初始状态 */
-  opacity: 0;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.45);
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-  /* 过渡效果 */
-  transition: opacity 0.3s ease;
+.slide-left-enter-from {
+  transform: translateX(100%);
+}
+.slide-left-leave-to {
+  transform: translateX(-100%);
+}
 
-  /* 确保覆盖层可以点击穿透 */
-  pointer-events: none;
+.slide-right-enter-from {
+  transform: translateX(-100%);
+}
+.slide-right-leave-to {
+  transform: translateX(100%);
+}
+
+.slide-left-enter-to,
+.slide-left-leave-from,
+.slide-right-enter-to,
+.slide-right-leave-from {
+  transform: translateX(0);
 }
 </style>

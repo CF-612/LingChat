@@ -8,6 +8,12 @@ const ComapionMode = () => import('../components/views/CompanionMode.vue')
 const MainMenu = () => import('../components/views/MainMenu.vue')
 const PetMode = () => import('../components/views/PetMode.vue')
 const Second = () => import('../components/views/Second.vue')
+const LogWindow = () => import('../components/views/LogWindow.vue')
+// 剧本编辑器体量较大，必须懒加载 —— 项目没有配 manualChunks，
+// 非懒加载的 view 会整个进主 chunk
+const ScriptEditor = () => import('../components/views/ScriptEditor.vue')
+// 云端创意工坊（主菜单「创意工坊」二级菜单进入，原设置页 workshop 标签迁移）
+const WorkshopPage = () => import('../components/views/WorkshopPage.vue')
 
 // 1. 定义路由表
 const routes = [
@@ -35,6 +41,21 @@ const routes = [
     path: '/second',
     name: 'Second',
     component: Second,
+  },
+  {
+    path: '/log-window',
+    name: 'LogWindow',
+    component: LogWindow,
+  },
+  {
+    path: '/script-editor',
+    name: 'ScriptEditor',
+    component: ScriptEditor,
+  },
+  {
+    path: '/workshop',
+    name: 'WorkshopPage',
+    component: WorkshopPage,
   },
 ]
 
