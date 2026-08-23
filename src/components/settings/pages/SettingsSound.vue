@@ -193,13 +193,6 @@
         >
           {{ $t('settings.sound.bgm.refresh') }}
         </button>
-        <!-- 打开文件夹 -->
-        <button
-          class="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-white/70 border border-white/20 hover:bg-white/20"
-          @click="handleOpenMusicFolder"
-        >
-          {{ $t('settings.sound.bgm.openFolder') }}
-        </button>
       </div>
 
       <!-- 音乐列表 -->
@@ -251,6 +244,13 @@
           class="flex-1 flex justify-center items-center gap-2"
         >
           <UploadCloud :size="18" /> {{ $t('settings.sound.bgm.add') }}
+        </Button>
+        <Button
+          type="big"
+          @click="handleOpenMusicFolder"
+          class="flex-1 flex justify-center items-center gap-2"
+        >
+          <FolderOpen :size="18" /> {{ $t('settings.sound.bgm.openFolder') }}
         </Button>
         <div class="flex-1 flex items-center justify-between gap-2">
           <span class="text-xs text-gray-400 truncate w-24" v-if="selectedPaths.length > 0">
@@ -467,6 +467,7 @@ import {
   Speaker,
   ScanLine,
   Star,
+  FolderOpen,
 } from 'lucide-vue-next'
 
 const uiStore = useUIStore()
