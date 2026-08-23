@@ -141,25 +141,96 @@
         </div>
       </div>
 
+      <!-- 音乐分类管理（子文件夹 = 子分类）：选项卡 + 新建 + 删除 + 刷新 -->
+      <div class="flex flex-wrap items-center gap-2 mt-4 mb-2">
+        <button
+          class="px-3 py-1 rounded-full text-xs font-semibold border transition-all"
+          :class="currentMusicCategory === '全部'
+            ? 'bg-purple-500/80 border-purple-400 text-white'
+            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'"
+          @click="currentMusicCategory = '全部'"
+        >
+          {{ $t('settings.sound.bgm.categoryAll') }}
+        </button>
+        <button
+          v-for="cat in musicCategories"
+          :key="cat"
+          class="px-3 py-1 rounded-full text-xs font-semibold border transition-all"
+          :class="currentMusicCategory === cat
+            ? 'bg-purple-500/80 border-purple-400 text-white'
+            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'"
+          @click="currentMusicCategory = cat"
+        >
+          {{ cat }}
+        </button>
+        <!-- 新建分类 -->
+        <div class="flex items-center gap-1">
+          <input
+            v-model="newMusicCategoryName"
+            :placeholder="$t('settings.sound.bgm.categoryNamePlaceholder')"
+            class="w-28 px-2 py-1 rounded-lg bg-black/30 border border-white/15 text-white text-xs focus:border-purple-400 focus:outline-none"
+            @keyup.enter="handleCreateMusicCategory"
+          />
+          <button
+            class="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/80 text-white border border-purple-400 hover:bg-purple-500"
+            @click="handleCreateMusicCategory"
+          >
+            {{ $t('settings.sound.bgm.categoryAdd') }}
+          </button>
+        </div>
+        <!-- 删除当前选中的分类 -->
+        <button
+          v-if="currentMusicCategory !== '全部'"
+          class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-300 border border-red-400/40 hover:bg-red-500/30"
+          @click="handleDeleteMusicCategory"
+        >
+          {{ $t('settings.sound.bgm.categoryDelete') }}
+        </button>
+        <!-- 刷新 -->
+        <button
+          class="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-white/70 border border-white/20 hover:bg-white/20"
+          @click="handleRefreshMusic"
+        >
+          {{ $t('settings.sound.bgm.refresh') }}
+        </button>
+        <!-- 打开文件夹 -->
+        <button
+          class="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-white/70 border border-white/20 hover:bg-white/20"
+          @click="handleOpenMusicFolder"
+        >
+          {{ $t('settings.sound.bgm.openFolder') }}
+        </button>
+      </div>
+
       <!-- 音乐列表 -->
       <div
         class="mt-4 border border-white/10 rounded-xl bg-black/20 backdrop-blur-sm overflow-hidden flex flex-col"
       >
-        <div v-if="musicList.length === 0" class="text-center text-gray-400 py-8 text-sm">
+        <div v-if="filteredMusicList.length === 0" class="text-center text-gray-400 py-8 text-sm">
           {{ $t('settings.sound.bgm.empty') }}
         </div>
         <div v-else class="max-h-52 overflow-y-auto p-1.5 space-y-1 custom-scrollbar">
           <div
-            v-for="music in musicList"
+            v-for="music in filteredMusicList"
             :key="music.url"
             @click="playMusic(music)"
             class="group flex justify-between items-center px-3 py-2.5 cursor-pointer rounded-lg transition-all duration-200 hover:bg-white/10"
             :class="{ 'bg-purple-500/20 text-purple-300': currentMusicName === music.name }"
           >
             <div
-              class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium pr-2"
+              class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium pr-2 flex items-center gap-2"
             >
-              {{ music.name }}
+              <button
+                @click.stop="handleToggleMusicFavorite(music.url)"
+                class="shrink-0 p-0.5 rounded transition-opacity opacity-0 group-hover:opacity-100"
+                :title="isMusicFavored(music.url) ? $t('settings.sound.bgm.unfav') : $t('settings.sound.bgm.fav')"
+              >
+                <Star
+                  :size="14"
+                  :class="isMusicFavored(music.url) ? 'text-amber-400 fill-amber-400' : 'text-white/60 hover:text-white'"
+                />
+              </button>
+              <span class="truncate">{{ music.name }}</span>
             </div>
             <button
               @click.stop="deleteMusic(music)"
@@ -352,6 +423,10 @@ import {
   musicDelete,
   musicGetAll,
   musicUpload,
+  musicListCategories,
+  musicCreateCategory,
+  musicDeleteCategory,
+  openMusicFolder,
   setCurrentBackgroundMusic,
 } from '../../../api/services/music'
 import { ambientGetAll, ambientUpload, ambientDelete, type AmbientItem } from '../../../api/services/ambient'
@@ -391,6 +466,7 @@ import {
   X,
   Speaker,
   ScanLine,
+  Star,
 } from 'lucide-vue-next'
 
 const uiStore = useUIStore()
@@ -450,9 +526,38 @@ const backgroundAudioPlayer = ref<HTMLAudioElement | null>(null)
 interface MusicItem {
   name: string
   url: string
+  category?: string
 }
 
 const musicList = ref<MusicItem[]>([])
+
+// 音乐分类（子文件夹 = 子分类）
+const musicCategories = ref<string[]>([])
+const currentMusicCategory = ref<string>('全部')
+const newMusicCategoryName = ref('')
+
+// 音乐收藏（localStorage 置顶）
+const MUSIC_FAVORED_KEY = 'lingchat.music.favored.v1'
+const musicFavored = ref<string[]>([])
+const isMusicFavored = (url: string): boolean => musicFavored.value.includes(url)
+function handleToggleMusicFavorite(url: string): void {
+  if (musicFavored.value.includes(url)) {
+    musicFavored.value = musicFavored.value.filter((u) => u !== url)
+  } else {
+    musicFavored.value.push(url)
+  }
+  localStorage.setItem(MUSIC_FAVORED_KEY, JSON.stringify(musicFavored.value))
+}
+
+// 根据分类过滤音乐列表，并按收藏置顶排序
+const filteredMusicList = computed(() => {
+  const base = !currentMusicCategory.value || currentMusicCategory.value === '全部'
+    ? musicList.value
+    : musicList.value.filter((m) => m.category === currentMusicCategory.value)
+  const favored = [...base].filter((m) => isMusicFavored(m.url))
+  const unfavored = [...base].filter((m) => !isMusicFavored(m.url))
+  return [...favored, ...unfavored]
+})
 
 // 批量上传状态
 const selectedPaths = ref<string[]>([])
@@ -725,6 +830,59 @@ const loadMusicList = async () => {
   musicList.value = await musicGetAll()
 }
 
+// 加载音乐分类列表
+const loadMusicCategories = async () => {
+  const cats = await musicListCategories()
+  musicCategories.value = cats
+  if (currentMusicCategory.value !== '全部' && !cats.includes(currentMusicCategory.value)) {
+    currentMusicCategory.value = '全部'
+  }
+}
+
+// 新建音乐分类
+const handleCreateMusicCategory = async () => {
+  const name = newMusicCategoryName.value.trim()
+  if (!name) return
+  try {
+    await musicCreateCategory(name)
+    newMusicCategoryName.value = ''
+    await loadMusicCategories()
+    await loadMusicList()
+  } catch (error: any) {
+    dialogStore.alert(typeof error === 'string' ? error : error.message || '创建分类失败')
+  }
+}
+
+// 删除当前选中的音乐分类（音乐移到根目录）
+const handleDeleteMusicCategory = async () => {
+  const cat = currentMusicCategory.value
+  if (cat === '全部') return
+  if (!await dialogStore.confirm(t('settings.sound.bgm.categoryDeleteConfirmMove', { name: cat }))) return
+  try {
+    await musicDeleteCategory(cat, 'move')
+    currentMusicCategory.value = '全部'
+    await loadMusicCategories()
+    await loadMusicList()
+  } catch (error: any) {
+    dialogStore.alert(typeof error === 'string' ? error : error.message || '删除分类失败')
+  }
+}
+
+// 刷新音乐与分类
+const handleRefreshMusic = async () => {
+  await loadMusicCategories()
+  await loadMusicList()
+}
+
+// 打开音乐所在文件夹
+const handleOpenMusicFolder = async () => {
+  try {
+    await openMusicFolder()
+  } catch (error: any) {
+    dialogStore.alert(typeof error === 'string' ? error : error.message || '打开文件夹失败')
+  }
+}
+
 const deleteMusic = async (music: MusicItem) => {
   if (!music) return
   if (!await dialogStore.confirm(t('settings.sound.bgm.confirmDelete', { name: music.name }))) return
@@ -763,7 +921,8 @@ const uploadMusic = async () => {
     for (const path of selectedPaths.value) {
       // content:// URI 文件名是 URL 编码的，解码后才是真实文件名
       const fileName = decodePathFileName(path)
-      const result = await musicUpload(path, fileName)
+      const upCat = currentMusicCategory.value === '全部' ? undefined : currentMusicCategory.value
+      const result = await musicUpload(path, fileName, upCat)
       // 自动修正时弹顶部 amber notice
       if (result.was_corrected) {
         const originalExt = result.original_name.split('.').pop() || ''
@@ -781,6 +940,7 @@ const uploadMusic = async () => {
 
     selectedPaths.value = []
     await loadMusicList()
+    await loadMusicCategories()
   } catch (error: any) {
     console.error('批量上传音乐出现问题:', error)
     const rawMsg = error.message || String(error)
@@ -841,7 +1001,15 @@ const triggerFileUpload = async () => {
 }
 
 onMounted(async () => {
+  // 加载音乐收藏
+  try {
+    const raw = localStorage.getItem(MUSIC_FAVORED_KEY)
+    musicFavored.value = raw ? JSON.parse(raw) : []
+  } catch {
+    musicFavored.value = []
+  }
   await loadMusicList()
+  await loadMusicCategories()
   await loadAmbientList()
 
   // 初始化音量

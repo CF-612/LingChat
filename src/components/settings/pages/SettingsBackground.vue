@@ -30,6 +30,19 @@
             {{ $t('settings.background.scene.openFolder') }}
           </button>
           <button
+            class="px-4 py-1.5 rounded-full text-sm font-bold transition-all border shadow-lg bg-white/10 border-white/20 text-white/80 hover:bg-white/20"
+            @click="openSortModal"
+          >
+            {{ $t('settings.background.sort.button') }}
+          </button>
+          <button
+            class="px-4 py-1.5 rounded-full text-sm font-bold transition-all border shadow-lg bg-white/10 border-white/20 text-white/80 hover:bg-white/20"
+            @click="handleRefreshScenes"
+            :title="$t('settings.background.scene.refreshTip')"
+          >
+            {{ $t('settings.background.scene.refresh') }}
+          </button>
+          <button
             class="px-4 py-1.5 rounded-full text-sm font-bold transition-all border shadow-lg bg-red-500/20 border-red-500/30 text-red-300 hover:bg-red-500/30"
             :disabled="!currentScene"
             @click="handleDeleteScene"
@@ -37,6 +50,55 @@
             {{ $t('settings.background.scene.delete') }}
           </button>
         </div>
+      </div>
+
+      <!-- 背景分类管理（子文件夹 = 子分类）：选项卡 + 新建 + 删除 -->
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <button
+          class="px-3 py-1 rounded-full text-xs font-semibold border transition-all"
+          :class="currentBackgroundCategory === '全部'
+            ? 'bg-brand/80 border-brand text-white'
+            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'"
+          @click="currentBackgroundCategory = '全部'"
+        >
+          {{ $t('settings.background.scene.categoryAll') }}
+        </button>
+        <button
+          v-for="cat in backgroundCategories"
+          :key="cat"
+          class="px-3 py-1 rounded-full text-xs font-semibold border transition-all"
+          :class="currentBackgroundCategory === cat
+            ? 'bg-brand/80 border-brand text-white'
+            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'"
+          @click="currentBackgroundCategory = cat"
+        >
+          {{ cat }}
+        </button>
+
+        <!-- 新建分类 -->
+        <div class="flex items-center gap-1">
+          <input
+            v-model="newCategoryName"
+            :placeholder="$t('settings.background.scene.categoryNamePlaceholder')"
+            class="w-28 px-2 py-1 rounded-lg bg-black/30 border border-white/15 text-white text-xs focus:border-indigo-400 focus:outline-none"
+            @keyup.enter="handleCreateCategory"
+          />
+          <button
+            class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/80 text-white border border-indigo-400 hover:bg-indigo-500"
+            @click="handleCreateCategory"
+          >
+            {{ $t('settings.background.scene.categoryAdd') }}
+          </button>
+        </div>
+
+        <!-- 删除当前选中的分类（非"全部"时显示） -->
+        <button
+          v-if="currentBackgroundCategory !== '全部'"
+          class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-300 border border-red-400/40 hover:bg-red-500/30"
+          @click="handleDeleteCategoryFlow"
+        >
+          {{ $t('settings.background.scene.categoryDelete') }}
+        </button>
       </div>
 
       <!-- 场景卡片网格 -->
@@ -59,6 +121,17 @@
             :title="$t('settings.background.scene.edit')"
           >
             <Wrench :size="16" />
+          </button>
+          <!-- 收藏置顶按钮（左上角星星） -->
+          <button
+            class="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/50 transition-all"
+            @click.stop="handleToggleFavorite(scene)"
+            :title="isFavored(scene.id) ? $t('settings.background.scene.unfav') : $t('settings.background.scene.fav')"
+          >
+            <Star
+              :size="16"
+              :class="isFavored(scene.id) ? 'text-amber-400 fill-amber-400' : 'text-white/60 hover:text-white'"
+            />
           </button>
 
           <!-- 背景预览 -->
@@ -140,6 +213,89 @@
         style="display: none"
       />
     </MenuItem>
+
+    <!-- 场景排序面板（浮层） -->
+    <div
+      v-if="showSortModal"
+      class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
+      <div
+        class="relative w-full max-w-3xl max-h-[85vh] overflow-hidden rounded-3xl border border-white/20 bg-slate-900/60 backdrop-blur-2xl shadow-2xl flex flex-col"
+        @click.stop
+      >
+        <div class="flex items-center justify-between border-b border-white/10 bg-white/10 p-4">
+          <h3 class="text-lg font-bold text-white">{{ $t('settings.background.sort.title') }}</h3>
+          <button
+            class="p-2 hover:bg-red-500/20 text-white/50 hover:text-white rounded-full transition-colors"
+            @click="showSortModal = false"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div
+          ref="sortListRef"
+          class="flex-1 overflow-y-auto p-4 space-y-2"
+          @mousemove="onSortMouseMove($event)"
+          @mouseup="onSortMouseUp"
+          @mouseleave="onSortMouseUp"
+        >
+          <div
+            v-for="(item, index) in sortItems"
+            :key="item.id"
+            @mousedown="onSortMouseDown($event, index)"
+            class="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 p-2 select-none cursor-grab active:cursor-grabbing"
+            :style="draggingIndex === index ? { transform: 'scale(1.03)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 10, position: 'relative' } : {}"
+            :class="index === overIndex ? 'ring-2 ring-indigo-400' : ''"
+          >
+            <template v-if="index === 0 || isSortItemFavored(item) !== isSortItemFavored(sortItems[index - 1])">
+              <div class="w-full row-span-1 text-xs font-bold text-white/40 uppercase tracking-widest pb-1 flex items-center gap-1">
+                <Star v-if="isSortItemFavored(item)" :size="12" class="text-amber-400" />
+                {{ isSortItemFavored(item)
+                  ? $t('settings.background.sort.favoredZone')
+                  : $t('settings.background.sort.unfavoredZone') }}
+              </div>
+            </template>
+            <img
+              v-if="item.background"
+              :src="convertFileSrc(item.background)"
+              class="w-16 h-10 object-cover rounded-lg shrink-0 pointer-events-none"
+              :alt="item.scene_name"
+            />
+            <div v-else class="w-16 h-10 rounded-lg bg-black/40 flex items-center justify-center text-white/20 shrink-0 pointer-events-none">
+              <Image :size="28" />
+            </div>
+            <Star
+              v-if="isSortItemFavored(item)"
+              :size="14"
+              class="text-amber-400 shrink-0 pointer-events-none"
+            />
+            <span class="flex-1 text-sm text-white/85 truncate pointer-events-none">{{ item.scene_name }}</span>
+            <span class="text-xs text-white/30 shrink-0 pointer-events-none">{{ index + 1 }}</span>
+          </div>
+          <div v-if="sortItems.length === 0" class="text-center text-white/40 py-8 text-sm">
+            {{ $t('settings.background.sort.empty') }}
+          </div>
+        </div>
+
+        <div class="p-3 bg-white/5 border-t border-white/10 flex justify-end gap-2">
+          <button
+            class="px-4 py-1.5 rounded-full text-sm font-bold bg-white/10 text-white/70 hover:bg-white/20"
+            @click="showSortModal = false"
+          >
+            {{ $t('settings.background.sort.cancel') }}
+          </button>
+          <button
+            class="px-4 py-1.5 rounded-full text-sm font-bold bg-indigo-500/80 text-white hover:bg-indigo-500"
+            @click="handleSaveSortOrder"
+          >
+            {{ $t('settings.background.sort.save') }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <MenuItem :title="$t('settings.background.particle.title')" size="large">
       <template #header>
@@ -406,6 +562,7 @@ import {
   updateScene,
   deleteScene,
   selectScene,
+  clearEmptyScenes,
   type SceneInfo,
   type LightingParams,
 } from '../../../api/services/scene'
@@ -415,6 +572,9 @@ import {
   uploadBackgroundImage,
   generateBackgroundImage,
   openBackgroundsFolder,
+  listBackgroundCategories,
+  createBackgroundCategory,
+  deleteBackgroundCategory,
 } from '../../../api/services/background'
 import { unlockAchievement } from '../../../api/services/achievement'
 import {
@@ -428,7 +588,7 @@ import {
   type PerfTier,
 } from '../../../api/services/cpu-perf'
 import { getGpuInfo, redetectGpu, type GpuInfo } from '../../../api/services/gpu-perf'
-import { Image, PictureInPicture, Sparkles, Settings, Wand2, Wrench, Cpu } from 'lucide-vue-next'
+import { Image, PictureInPicture, Sparkles, Settings, Wand2, Wrench, Cpu, Star } from 'lucide-vue-next'
 import SceneEditModal from '../scene/SceneEditModal.vue'
 import DialogAppearancePanel from '../dialog/DialogAppearancePanel.vue'
 import { useUserStore } from '../../../stores/modules/user/user'
@@ -519,16 +679,111 @@ const suggestedFps = computed(() =>
 
 const scenes = ref<SceneInfo[]>([])
 
+// ── 场景收藏 + 手动排序（localStorage 持久化）──
+const SCENE_FAVORED_KEY = 'lingchat.scene.favored.v1'
+const SCENE_ORDER_KEY = 'lingchat.scene.order.v1'
+
+function loadSceneOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(SCENE_ORDER_KEY)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
+function saveSceneOrderToStorage(order: string[]): void {
+  try {
+    localStorage.setItem(SCENE_ORDER_KEY, JSON.stringify(order))
+  } catch {
+    // ignore
+  }
+}
+function loadFavored(): string[] {
+  try {
+    const raw = localStorage.getItem(SCENE_FAVORED_KEY)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
+}
+function saveFavoredToStorage(favored: string[]): void {
+  try {
+    localStorage.setItem(SCENE_FAVORED_KEY, JSON.stringify(favored))
+  } catch {
+    // ignore
+  }
+}
+// 显示顺序 = [收藏场景(按 favored 顺序)] + [未收藏场景(按 scene.order 相对顺序)]
+function applySceneOrder(list: SceneInfo[]): SceneInfo[] {
+  const favored = loadFavored()
+  const order = loadSceneOrder()
+  const favoredSet = new Set(favored)
+  const favoredScenes = favored
+    .map((id) => list.find((s) => s.id === id))
+    .filter((s): s is SceneInfo => !!s)
+  const unfavoredScenes = list.filter((s) => !favoredSet.has(s.id))
+  const orderIndex = (id: string) => {
+    const i = order.indexOf(id)
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  }
+  unfavoredScenes.sort((a, b) => orderIndex(a.id) - orderIndex(b.id))
+  return [...favoredScenes, ...unfavoredScenes]
+}
+function isFavored(sceneId: string): boolean {
+  return loadFavored().includes(sceneId)
+}
+async function handleToggleFavorite(scene: SceneInfo): Promise<void> {
+  let favored = loadFavored()
+  if (favored.includes(scene.id)) {
+    favored = favored.filter((id) => id !== scene.id)
+    saveFavoredToStorage(favored)
+    const order = loadSceneOrder()
+    const nextOrder = [scene.id, ...order.filter((id) => id !== scene.id)]
+    saveSceneOrderToStorage(nextOrder)
+  } else {
+    favored = [...favored, scene.id]
+    saveFavoredToStorage(favored)
+    const order = loadSceneOrder().filter((id) => id !== scene.id)
+    saveSceneOrderToStorage(order)
+  }
+  scenes.value = applySceneOrder(scenes.value)
+}
+
+// ── 背景分类（子文件夹）+ 场景过滤 ──
+const backgroundCategories = ref<string[]>([])
+const currentBackgroundCategory = ref<string>('全部')
+const newCategoryName = ref('')
+
+// 场景的背景 → 所属分类 映射（url → category），用于按分类过滤场景卡片
+function categoryOfBackground(url: string): string {
+  if (!url) return '根目录'
+  const matched = backgroundList.value.find((b) => b.url === url)
+  return matched?.category || '根目录'
+}
+
+// 收藏置顶排序后的完整场景列表（再按背景分类过滤）
+const orderedScenes = computed(() => applySceneOrder(scenes.value))
+// 按当前选中的背景分类过滤场景
+const filteredScenes = computed(() => {
+  if (!currentBackgroundCategory.value || currentBackgroundCategory.value === '全部') {
+    return orderedScenes.value
+  }
+  return orderedScenes.value.filter((s) => {
+    const bgPath = s.background || ''
+    return categoryOfBackground(bgPath) === currentBackgroundCategory.value
+  })
+})
+
 // 分页
 const ITEMS_PER_PAGE = 6
 const currentPage = ref(1)
-const totalPages = computed(() => Math.max(1, Math.ceil(scenes.value.length / ITEMS_PER_PAGE)))
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredScenes.value.length / ITEMS_PER_PAGE)))
 const paginatedScenes = computed(() => {
   const start = (currentPage.value - 1) * ITEMS_PER_PAGE
-  return scenes.value.slice(start, start + ITEMS_PER_PAGE)
+  return filteredScenes.value.slice(start, start + ITEMS_PER_PAGE)
 })
-// 场景变化时回到第一页
-watch(scenes, () => {
+// 场景或切分类变化时回到第一页
+watch([scenes, currentBackgroundCategory], () => {
   if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
 })
 
@@ -743,6 +998,64 @@ async function fetchBackgrounds(): Promise<BackgroundImageInfo[]> {
 async function refreshBackground(): Promise<void> {
   const items = await fetchBackgrounds()
   backgroundList.value = items
+  await loadBackgroundCategories()
+}
+
+async function loadBackgroundCategories(): Promise<void> {
+  try {
+    const cats = await listBackgroundCategories()
+    backgroundCategories.value = cats
+    if (currentBackgroundCategory.value !== '全部' && !cats.includes(currentBackgroundCategory.value)) {
+      currentBackgroundCategory.value = '全部'
+    }
+  } catch (error) {
+    console.error('加载背景分类失败', error)
+  }
+}
+
+async function handleCreateCategory(): Promise<void> {
+  const name = newCategoryName.value.trim()
+  if (!name) {
+    await dialogStore.alert(t('settings.background.scene.categoryNameEmpty'))
+    return
+  }
+  try {
+    await createBackgroundCategory(name)
+    newCategoryName.value = ''
+    await refreshBackground()
+    await fetchScenes()
+    uiStore.showSuccess({
+      title: t('settings.background.scene.categoryCreated'),
+      message: t('settings.background.scene.categoryCreatedMsg', { name }),
+      duration: 3000,
+    })
+  } catch (error: any) {
+    console.error('创建分类失败:', error)
+    await dialogStore.alert(t('settings.background.scene.categoryCreateFail'))
+  }
+}
+
+async function handleDeleteCategoryFlow(): Promise<void> {
+  const cat = currentBackgroundCategory.value
+  if (!cat || cat === '全部') return
+  const confirmed = await dialogStore.confirm(
+    t('settings.background.scene.categoryDeleteConfirmMove', { name: cat }),
+  )
+  if (!confirmed) return
+  try {
+    const result = await deleteBackgroundCategory(cat, 'move_to_root')
+    await refreshBackground()
+    await fetchScenes()
+    currentBackgroundCategory.value = '全部'
+    uiStore.showSuccess({
+      title: t('settings.background.scene.categoryDeleted'),
+      message: t('settings.background.scene.categoryDeletedMoved', { name: cat, count: result }),
+      duration: 3000,
+    })
+  } catch (error) {
+    console.error('删除分类失败:', error)
+    await dialogStore.alert(t('settings.background.scene.categoryDeleteFail'))
+  }
 }
 
 function triggerUpload(): void {
@@ -787,6 +1100,101 @@ async function handleOpenFolder(): Promise<void> {
     uiStore.showError({
       title: t('settings.background.folder.errorTitle'),
       message: t('settings.background.folder.openFailed'),
+    })
+  }
+}
+
+// ── 场景排序面板（自研指针拖拽）──
+const showSortModal = ref(false)
+const sortItems = ref<SceneInfo[]>([])
+const sortListRef = ref<HTMLElement | null>(null)
+const draggingIndex = ref(-1)
+const overIndex = ref(-1)
+
+function openSortModal(): void {
+  const all = filteredScenes.value
+  sortItems.value = all.map((s) => ({ ...s }))
+  showSortModal.value = true
+}
+
+function isSortItemFavored(item: SceneInfo): boolean {
+  return loadFavored().includes(item.id)
+}
+
+function onSortMouseDown(event: MouseEvent, index: number): void {
+  event.preventDefault()
+  draggingIndex.value = index
+  overIndex.value = index
+}
+
+function onSortMouseMove(event: MouseEvent): void {
+  if (draggingIndex.value === -1) return
+  const list = sortListRef.value
+  if (!list) return
+  const items = Array.from(list.querySelectorAll<HTMLElement>(':scope > div'))
+  const draggedFavored = isSortItemFavored(sortItems.value[draggingIndex.value])
+  let zoneBoundary = 0
+  sortItems.value.forEach((it, i) => {
+    if (isSortItemFavored(it)) zoneBoundary = i + 1
+  })
+  const pointerY = event.clientY
+  let target = draggingIndex.value
+  items.forEach((el, i) => {
+    const rect = el.getBoundingClientRect()
+    const mid = rect.top + rect.height / 2
+    if (pointerY > mid) target = i
+  })
+  if (draggedFavored) {
+    target = Math.max(0, Math.min(target, Math.max(0, zoneBoundary - 1)))
+  } else {
+    target = Math.max(zoneBoundary, Math.min(target, sortItems.value.length - 1))
+  }
+  if (target !== overIndex.value) {
+    overIndex.value = target
+    const arr = [...sortItems.value]
+    const [moved] = arr.splice(draggingIndex.value, 1)
+    arr.splice(target, 0, moved)
+    sortItems.value = arr
+    draggingIndex.value = target
+  }
+}
+
+function onSortMouseUp(): void {
+  draggingIndex.value = -1
+  overIndex.value = -1
+}
+
+async function handleSaveSortOrder(): Promise<void> {
+  const favored = loadFavored()
+  const favoredSet = new Set(favored)
+  const newFavoredOrder = sortItems.value.filter((s) => favoredSet.has(s.id)).map((s) => s.id)
+  const newOrder = sortItems.value.filter((s) => !favoredSet.has(s.id)).map((s) => s.id)
+  if (newFavoredOrder.length > 0) saveFavoredToStorage(newFavoredOrder)
+  if (newOrder.length > 0) saveSceneOrderToStorage(newOrder)
+  showSortModal.value = false
+  scenes.value = applySceneOrder(scenes.value)
+  uiStore.showSuccess({
+    title: t('settings.background.sort.saved'),
+    duration: 2000,
+  })
+}
+
+// ── 刷新：删除空场景 + 刷新背景 + 刷新列表（合并为一个按钮）──
+async function handleRefreshScenes(): Promise<void> {
+  try {
+    const removed = await clearEmptyScenes()
+    await refreshBackground()
+    await fetchScenes()
+    uiStore.showSuccess({
+      title: t('settings.background.scene.refreshDone'),
+      message: t('settings.background.scene.refreshDoneMsg'),
+      duration: 3000,
+    })
+  } catch (e: any) {
+    console.error('刷新场景失败:', e)
+    uiStore.showError({
+      title: t('settings.background.scene.refreshFail'),
+      message: e?.message || '',
     })
   }
 }

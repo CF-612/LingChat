@@ -64,6 +64,12 @@ export async function deleteScene(id: string): Promise<void> {
   return invoke('delete_scene', { id })
 }
 
+/** 一键清除空白场景：删除背景已不存在的场景，返回删除数量 */
+export async function clearEmptyScenes(): Promise<number> {
+  const data = await invoke<number>('clear_empty_scenes')
+  return data ?? 0
+}
+
 export async function selectScene(sceneId: string | null): Promise<void> {
   return invoke('select_scene', { sceneId })
 }

@@ -62,15 +62,12 @@ fn to_background_fullpath(filename: &str) -> String {
     if filename.is_empty() {
         return String::new();
     }
-    // 如果已经是完整路径（旧数据兼容），先提取文件名再拼接
-    let name = to_background_filename(filename);
-    if name.is_empty() {
-        return String::new();
+    // 先在背景目录（含子文件夹）里按文件名递归查找，支持背景放在子分类下
+    if let Some(found) = super::background::find_background_file_recursive(&data_dir(), filename) {
+        return found;
     }
-    super::backgrounds_dir()
-        .join(&name)
-        .to_string_lossy()
-        .into_owned()
+    // 找不到：返回空字符串，前端走"缺图占位"分支（显示缺图图标）
+    String::new()
 }
 
 /// 【已废弃】改为仅提取文件名；保留此函数供外部用（game.rs），行为改为解析为完整路径。
@@ -104,7 +101,8 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
         .load_all()
         .map_err(|e| format!("加载场景列表失败: {}", e))?;
 
-    // 自动将背景目录中未被注册为场景的图片注册为场景
+    // 自动将背景目录（含子文件夹）中未被注册为场景的图片注册为场景。
+    // 去重依据：场景存的是纯文件名，这里收集所有场景背景的文件名做比对。
     let bg_dir = super::backgrounds_dir();
     let existing_bgs: HashSet<String> = scenes
         .iter()
@@ -116,44 +114,41 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
     let mut added = false;
 
     if bg_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&bg_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_file() {
-                    continue;
-                }
-                let ext = path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("")
-                    .to_lowercase();
-                if !allowed.contains(&ext.as_str()) {
-                    continue;
-                }
-                let file_name = path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_default();
-                if existing_bgs.contains(&file_name) {
-                    continue;
-                }
-                // 自动注册：名称为文件名（不含后缀），仅存文件名
-                let name = path
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                let now = now_iso();
-                scenes.push(Scene {
-                    id: Uuid::new_v4().to_string(),
-                    name,
-                    description: String::new(),
-                    background: file_name.clone(),
-                    lighting: None,
-                    created_at: now.clone(),
-                    updated_at: now,
-                });
-                added = true;
+        // 递归收集背景目录（含子文件夹）下的所有背景文件路径
+        let mut files: Vec<std::path::PathBuf> = Vec::new();
+        super::background::collect_background_files_recursive_pub(&bg_dir, &mut files);
+        for path in files {
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if !allowed.contains(&ext.as_str()) {
+                continue;
             }
+            let file_name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if existing_bgs.contains(&file_name) {
+                continue;
+            }
+            // 自动注册：名称为文件名（不含后缀），仅存文件名
+            let name = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let now = now_iso();
+            scenes.push(Scene {
+                id: Uuid::new_v4().to_string(),
+                name,
+                description: String::new(),
+                background: file_name.clone(),
+                lighting: None,
+                created_at: now.clone(),
+                updated_at: now,
+            });
+            added = true;
         }
     }
 
@@ -242,6 +237,43 @@ pub async fn delete_scene(app: AppHandle, id: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// 一键清除「空白场景」：遍历所有场景，删除那些背景图片已不存在（解析为空）/缺图的场景。
+/// 返回被删除的场景数量。用于清理因背景文件被改名/删除/移动而残留的空白场景。
+#[tauri::command]
+pub async fn clear_empty_scenes(app: AppHandle) -> Result<usize, String> {
+    let store = SceneStore::new(&data_dir());
+    let mut scenes = store
+        .load_all()
+        .map_err(|e| format!("加载场景列表失败: {}", e))?;
+
+    let before = scenes.len();
+    // 保留那些背景仍能解析到的场景；删除背景为空的场景
+    scenes.retain(|s| {
+        let bg = normalize_background(&s.background);
+        !bg.is_empty()
+    });
+    let removed = before - scenes.len();
+
+    if removed > 0 {
+        store
+            .save_all(&scenes)
+            .map_err(|e| format!("保存场景失败: {}", e))?;
+
+        // 若删除的场景是当前选中场景，清除引用
+        let state = app.state::<AppState>();
+        let service = state.ai_service.lock().await;
+        let mut gs = service.game_status.lock().await;
+        if let Some(ref scene_id) = gs.current_scene_id {
+            let still_exists = scenes.iter().any(|s| &s.id == scene_id);
+            if !still_exists {
+                gs.current_scene_id = None;
+            }
+        }
+    }
+
+    Ok(removed)
 }
 
 #[tauri::command]

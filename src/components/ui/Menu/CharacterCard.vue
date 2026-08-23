@@ -7,6 +7,17 @@
     >
       <Cat :size="20" />
     </div>
+    <!-- 收藏按钮（左上角，悬浮显示；已收藏为金色实心） -->
+    <button
+      class="absolute top-2 left-2 z-10 p-1.5 rounded-lg bg-black/5 transition-all opacity-0 group-hover:opacity-100"
+      @click.stop="handleToggleFavored"
+      :title="isCharFavored(id) ? $t('ui.characterCard.unfav') : $t('ui.characterCard.fav')"
+    >
+      <Star
+        :size="16"
+        :class="isCharFavored(id) ? 'text-amber-400 fill-amber-400' : 'text-white/60 hover:text-white'"
+      />
+    </button>
     <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
       <RoleExportMenu
         :role-id="id"
@@ -161,7 +172,7 @@
             </h3>
             <div
               v-if="clothes?.length"
-              class="flex snap-x gap-4 overflow-x-auto pb-2"
+              class="clothes-scroll flex snap-x gap-4 overflow-x-auto pb-2"
             >
               <div
                 v-for="cloth in clothes"
@@ -226,7 +237,7 @@ import {
 import { useGameStore } from '@/stores/modules/game'
 import { applyWebInitData } from '@/stores/modules/game/actions'
 import { useDialogStore } from '@/stores/modules/ui/dialog'
-import { Settings } from 'lucide-vue-next'
+import { Settings, Star } from 'lucide-vue-next'
 import { Cat, Check } from 'lucide-vue-next'
 import type { Clothes } from '@/types'
 
@@ -249,11 +260,42 @@ const props = withDefaults(defineProps<CharacterProps>(), {
   resourceFolder: '',
 })
 
-const emit = defineEmits(['saved'])
+const emit = defineEmits(['saved', 'favoredChange'])
 
 // 状态管理
 const isDetailVisible = ref(false)
 const isSettingsModalVisible = ref(false)
+const CHARACTER_FAVORED_KEY = 'lingchat.character.favored.v1'
+// 收藏切换后自增，强制星标颜色/标题重算（组件可能被 key=id 复用，不重建实例）
+const favoredTick = ref(0)
+function loadCharFavored(): number[] {
+  try {
+    const raw = localStorage.getItem(CHARACTER_FAVORED_KEY)
+    return raw ? (JSON.parse(raw) as number[]) : []
+  } catch {
+    return []
+  }
+}
+function isCharFavored(id: number): boolean {
+  // 依赖 favoredTick，收藏切换后立即可见（触发重新求值）
+  void favoredTick.value
+  return loadCharFavored().includes(id)
+}
+async function handleToggleFavored(): Promise<void> {
+  let favored = loadCharFavored()
+  if (favored.includes(props.id)) {
+    favored = favored.filter((x) => x !== props.id)
+  } else {
+    favored = [...favored, props.id]
+  }
+  try {
+    localStorage.setItem(CHARACTER_FAVORED_KEY, JSON.stringify(favored))
+  } catch {
+    // 忽略
+  }
+  favoredTick.value++
+  emit('favoredChange')
+}
 
 const { t } = useI18n()
 const gameStore = useGameStore()
@@ -356,5 +398,29 @@ const handleSettingsSaved = () => emit('saved')
 .overflow-x-auto::-webkit-scrollbar,
 .overflow-y-auto::-webkit-scrollbar {
   display: none;
+}
+
+/* 服装横向列表：单独放开滚动条，方便下滑/拖动查看后面的服装 */
+.clothes-scroll {
+  padding-bottom: 8px;
+}
+.clothes-scroll::-webkit-scrollbar {
+  height: 8px;
+  display: block;
+}
+.clothes-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+}
+.clothes-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(129, 140, 248, 0.55); /* indigo-400 */
+  border-radius: 20px;
+}
+.clothes-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(129, 140, 248, 0.8);
+}
+.clothes-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(129, 140, 248, 0.55) rgba(255, 255, 255, 0.06);
 }
 </style>

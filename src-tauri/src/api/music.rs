@@ -1,9 +1,11 @@
 use std::fs;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use tauri_plugin_store::StoreExt;
 
 use crate::utils::path::validate_path_in_base;
+use crate::utils::system::open_folder;
 
 use super::music_dir;
 
@@ -15,6 +17,8 @@ pub struct MusicItemInfo {
     pub name: String,
     pub url: String,
     pub time: String,
+    /// 音乐所属子分类（子文件夹名；根目录为"根目录"）
+    pub category: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -32,6 +36,37 @@ pub struct UploadMusicResult {
 
 // ========== Tauri 命令 ==========
 
+// ========== 递归扫描音乐目录（含子文件夹，即子分类） ==========
+
+/// 递归收集音乐文件，并记录每个文件所属的子文件夹名（category）。
+fn collect_music_recursive(base: &Path, category: &str, out: &mut Vec<(std::path::PathBuf, String)>) {
+    if !base.exists() {
+        return;
+    }
+    let allowed_extensions = ["mp3", "wav", "flac", "webm", "weba", "ogg", "m4a", "oga"];
+    if let Ok(entries) = fs::read_dir(base) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                let is_music = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|e| allowed_extensions.contains(&e.to_lowercase().as_str()))
+                    .unwrap_or(false);
+                if is_music {
+                    out.push((path, category.to_string()));
+                }
+            } else if path.is_dir() {
+                let sub_cat = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| category.to_string());
+                collect_music_recursive(&path, &sub_cat, out);
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
     let music_dir = music_dir();
@@ -44,14 +79,11 @@ pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
 
     let mut items: Vec<MusicItemInfo> = Vec::new();
 
-    let entries = fs::read_dir(&music_dir).map_err(|e| format!("读取音乐目录失败: {}", e))?;
+    // 递归扫描音乐目录（含子文件夹/子分类），并记录每个文件所属的分类
+    let mut collected: Vec<(std::path::PathBuf, String)> = Vec::new();
+    collect_music_recursive(&music_dir, "根目录", &mut collected);
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-
+    for (path, category) in collected {
         let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
             continue;
         };
@@ -77,7 +109,7 @@ pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
 
         let url = path.to_string_lossy().into_owned();
 
-        items.push(MusicItemInfo { name, url, time });
+        items.push(MusicItemInfo { name, url, time, category });
     }
 
     items.sort_by(|a, b| {
@@ -89,6 +121,85 @@ pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
     });
 
     Ok(items)
+}
+
+/// 列出所有音乐子分类（去重），供前端选项卡使用。
+#[tauri::command]
+pub fn list_music_categories() -> Result<Vec<String>, String> {
+    let music_dir = music_dir();
+    if !music_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut cats = std::collections::BTreeSet::new();
+    fn walk(base: &Path, cats: &mut std::collections::BTreeSet<String>) {
+        if let Ok(entries) = fs::read_dir(base) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        cats.insert(name.to_string());
+                    }
+                    walk(&path, cats);
+                }
+            }
+        }
+    }
+    walk(&music_dir, &mut cats);
+    Ok(cats.into_iter().collect())
+}
+
+/// 新建一个音乐子分类（子文件夹）。
+#[tauri::command]
+pub fn create_music_category(name: String) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() || name == "根目录" || name == "全部" {
+        return Err("无效的分类名".into());
+    }
+    let dir = music_dir().join(name);
+    fs::create_dir_all(&dir).map_err(|e| format!("创建分类目录失败: {}", e))
+}
+
+/// 删除一个音乐子分类：mode = "move" 把其下音乐移到根目录；"delete" 连同音乐一起删除。返回受影响数量。
+#[tauri::command]
+pub fn delete_music_category(name: String, mode: String) -> Result<usize, String> {
+    let name = name.trim();
+    if name.is_empty() || name == "根目录" || name == "全部" {
+        return Err("无效的分类名".into());
+    }
+    let dir = music_dir().join(name);
+    if !dir.is_dir() {
+        return Ok(0);
+    }
+    let mut count = 0usize;
+    let entries = fs::read_dir(&dir).map_err(|e| format!("读取目录失败: {}", e))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            match mode.as_str() {
+                "move" => {
+                    let dest = music_dir().join(path.file_name().unwrap_or_default());
+                    let _ = fs::rename(&path, &dest);
+                    count += 1;
+                }
+                _ => {
+                    let _ = fs::remove_file(&path);
+                    count += 1;
+                }
+            }
+        }
+    }
+    let _ = fs::remove_dir_all(&dir);
+    Ok(count)
+}
+
+/// 打开音乐所在文件夹。
+#[tauri::command]
+pub fn open_music_folder() -> Result<(), String> {
+    let dir = music_dir();
+    if !dir.exists() {
+        fs::create_dir_all(&dir).map_err(|e| format!("创建音乐目录失败: {}", e))?;
+    }
+    open_folder(&dir.to_string_lossy())
 }
 
 #[tauri::command]
@@ -113,6 +224,7 @@ pub async fn upload_music(
     app: tauri::AppHandle,
     path: String,
     file_name: String,
+    category: Option<String>,
 ) -> Result<UploadMusicResult, String> {
     // Android SAF：先把 content URI 复制到本地 cache，magic sniff 和后续复制都用本地路径。
     let src =
@@ -162,18 +274,32 @@ pub async fn upload_music(
             .unwrap_or("track");
         let corrected_name = format!("{stem}.{correct_ext}");
 
-        // 4. 确保目标目录存在
+        // 4. 确保目标目录存在：若指定分类，则写入对应子文件夹
         let music_dir = music_dir();
-        if !music_dir.exists() {
-            tokio::fs::create_dir_all(&music_dir)
-                .await
-                .map_err(|e| format!("创建音乐目录失败: {}", e))?;
-        }
+        let target_dir = match category.as_deref() {
+            Some(cat) if !cat.trim().is_empty() && cat != "根目录" && cat != "全部" => {
+                let sub = music_dir.join(cat.trim());
+                if !sub.exists() {
+                    tokio::fs::create_dir_all(&sub)
+                        .await
+                        .map_err(|e| format!("创建分类目录失败: {}", e))?;
+                }
+                sub
+            }
+            _ => {
+                if !music_dir.exists() {
+                    tokio::fs::create_dir_all(&music_dir)
+                        .await
+                        .map_err(|e| format!("创建音乐目录失败: {}", e))?;
+                }
+                music_dir.clone()
+            }
+        };
 
         // 5. 冲突时按 _2/_3/... 后缀
         let mut final_name = corrected_name;
         let mut counter = 2u32;
-        while music_dir.join(&final_name).exists() {
+        while target_dir.join(&final_name).exists() {
             if counter > 999 {
                 final_name = format!(
                     "{stem}_{}{}",
@@ -188,7 +314,7 @@ pub async fn upload_music(
 
         // 仅扩展名/名字实质变化才算"自动修正"；纯大小写差异（Song.MP3 → Song.mp3）不算。
         let was_corrected = !original_name.eq_ignore_ascii_case(&final_name);
-        let file_path = music_dir.join(&final_name);
+        let file_path = target_dir.join(&final_name);
 
         // 6. 复制（src.path 是本地 cache，dest 也是本地路径，用 std::fs::copy）
         std::fs::copy(&src.path, &file_path).map_err(|e| format!("复制文件失败: {}", e))?;

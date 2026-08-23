@@ -33,6 +33,8 @@ export interface BackgroundImageInfo {
   title: string
   url: string
   time: string
+  /** 所属子分类（子文件夹名；根目录为“根目录”） */
+  category?: string
 }
 
 export interface Clothes {
@@ -71,4 +73,6 @@ export interface MusicTrack {
   name: string
   url: string
   time: string
+  /** 所属子分类（子文件夹名；根目录为“根目录”） */
+  category?: string
 }

@@ -18,6 +18,7 @@
           :clothes="character.clothes || []"
           :resource-folder="character.resourceFolder"
           @saved="handleSettingsSaved"
+          @favoredChange="applyCharacterFavoriteOrder"
         />
       </div>
 
@@ -125,6 +126,28 @@ interface CharacterCardData {
 const characters = ref<CharacterCardData[]>([])
 const currentPage = ref(1)
 const totalPages = ref(1)
+const CHARACTER_FAVORED_KEY = 'lingchat.character.favored.v1'
+function loadCharFavored(): number[] {
+  try {
+    const raw = localStorage.getItem(CHARACTER_FAVORED_KEY)
+    return raw ? (JSON.parse(raw) as number[]) : []
+  } catch {
+    return []
+  }
+}
+function isCharFavored(id: number): boolean {
+  return loadCharFavored().includes(id)
+}
+// 收藏的角色排在前（按收藏先后），当前页内排序
+function applyCharacterFavoriteOrder(): void {
+  const favored = loadCharFavored()
+  const favoredSet = new Set(favored)
+  const favoredChars = favored
+    .map((id) => characters.value.find((c) => c.id === id))
+    .filter((c): c is CharacterCardData => !!c)
+  const others = characters.value.filter((c) => !favoredSet.has(c.id))
+  characters.value = [...favoredChars, ...others]
+}
 const gameStore = useGameStore()
 const uiStore = useUIStore()
 const router = useRouter()
@@ -164,6 +187,7 @@ const fetchCharacters = async (page: number): Promise<void> => {
     }
 
     characters.value = result.items.map(mapCharacter)
+    applyCharacterFavoriteOrder()
   } catch (error) {
     console.error('获取角色列表失败:', error)
     characters.value = []
@@ -176,6 +200,7 @@ const fetchCharactersInternal = async (page: number): Promise<void> => {
     const result = await characterGetAll(page)
     totalPages.value = result.total_pages
     characters.value = result.items.map(mapCharacter)
+    applyCharacterFavoriteOrder()
   } catch (error) {
     console.error('获取角色列表失败:', error)
     characters.value = []
