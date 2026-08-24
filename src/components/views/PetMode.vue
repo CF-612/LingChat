@@ -9,6 +9,7 @@
     <!-- DialogueBox 区域 -->
     <div
       class="w-full shrink-0 flex flex-col justify-end transition-none bg-transparent"
+      :class="{ 'opacity-0 pointer-events-none': !uiStore.petReady }"
       :style="{ height: 'var(--dialog-h)' }"
     >
       <PetNotification />
@@ -28,7 +29,39 @@
       class="shrink-0 flex items-center justify-center transition-all duration-100 bg-transparent"
       :style="{ width: 'var(--avatar-size)', height: 'var(--avatar-size)' }"
     >
+      <!-- 就绪前在圆形内显示「爪印 + 转圈」加载图标，隐藏角色；等待期间仍可按住拖动 -->
+      <div
+        v-if="!uiStore.petReady"
+        class="relative flex flex-col items-center justify-center gap-2 w-full h-full select-none"
+        style="cursor: grab"
+        @mousedown="startDraggingPet"
+      >
+        <!-- 半透明圆盘底：确保透明桌宠窗口下也清晰可见，最外圈加半透明灰描边 -->
+        <div class="absolute w-[70%] h-[70%] rounded-full bg-cyan-950/45 border border-white/15 backdrop-blur-sm"></div>
+        <div class="relative w-20 h-20 flex items-center justify-center">
+          <!-- 底环 -->
+          <div class="absolute inset-0 rounded-full border-4 border-cyan-500/25"></div>
+          <!-- 旋转缺口环 -->
+          <div class="absolute inset-0 rounded-full border-4 border-transparent border-t-cyan-400 border-r-cyan-400/40 animate-spin"></div>
+          <!-- 爪印 -->
+          <svg
+            class="w-10 h-10 text-cyan-400 fill-current"
+            style="filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.55))"
+            viewBox="0 0 100 100"
+          >
+            <ellipse cx="23" cy="46" rx="7" ry="11" />
+            <ellipse cx="40" cy="28" rx="8.5" ry="13" />
+            <ellipse cx="60" cy="28" rx="8.5" ry="13" />
+            <ellipse cx="77" cy="46" rx="7" ry="11" />
+            <path
+              d="M 28,70 C 24,56 36,50 50,50 C 64,50 76,56 72,70 C 68,81 58,79 50,79 C 42,79 32,81 28,70 Z"
+            />
+          </svg>
+        </div>
+        <p class="relative text-[10px] text-cyan-200/90">{{ t('views.petMode.loading') }}</p>
+      </div>
       <GameRolesStage
+        v-else
         @avatar-click="handleAvatarClick"
         @open-settings="handleOpenSettings"
         @switch-auto-mode="handleSwitchAutoMode"
@@ -45,7 +78,11 @@
       class="w-full shrink-0 flex items-start justify-center transition-none bg-transparent"
       :style="{ height: 'var(--chat-h)' }"
     >
-      <ChatInput ref=ChatInputRef :visible="showChatInput" @message-sent="handleMessageSent" />
+      <ChatInput
+        ref=ChatInputRef
+        :visible="showChatInput && uiStore.petReady"
+        @message-sent="handleMessageSent"
+      />
     </div>
   </div>
 </template>
@@ -121,6 +158,12 @@ let dialogHistoryUnlisten: (() => void) | null = null
 
 onMounted(async () => {
   const appWindow = getCurrentWindow()
+
+  // 非「开机自启/启动流程」进入的桌宠（如从主界面切过来）直接可用；
+  // 开机自启进入时 petBooting=true，由 App.vue 的启动流程在就绪后设置 petReady=true。
+  if (!uiStore.petBooting) {
+    uiStore.petReady = true
+  }
 
   scaleUnlisten = await appWindow.listen<{ scale: number }>('pet-scale-changed', (event) => {
     const scale = Number(event.payload?.scale)
@@ -238,6 +281,11 @@ const handleMessageSent = (message: string) => {
     displayName: gameStore.userName,
     content: message,
   })
+}
+
+/** 加载期间按住也能拖动桌宠（与角色头像的拖拽一致） */
+const startDraggingPet = () => {
+  getCurrentWindow().startDragging().catch(() => {})
 }
 
 

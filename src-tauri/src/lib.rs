@@ -279,7 +279,10 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        // 开机自启动时给启动命令追加 --autostart，方便区分「系统自启」与「手动启动」：
+        // 只有带 --autostart 的这次启动才按 boot_as_pet 进入桌宠，手动启动走主菜单。
+        .plugin(tauri_plugin_autostart::Builder::new().args(["--autostart"]).build());
 
     builder
         .setup(move |app| {
@@ -812,6 +815,9 @@ pub fn run() {
             ai_service::tts::local::tts_local_get_device,
             ai_service::tts::local::tts_local_list_devices,
             ai_service::tts::local::tts_local_set_device,
+            api::autostart::autostart_status,
+            api::autostart::autostart_set_enabled,
+            api::autostart::autostart_boot_apply,
             exit_app,
         ])
         .run(context)

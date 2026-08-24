@@ -16,16 +16,19 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
+
+import { getAutostartStatus } from './api/services/config'
+import { useGameStore } from './stores/modules/game'
 import CursorEffects from './components/effects/CursorEffects.vue'
 import Notification from './components/ui/Notification.vue'
 import AchievementToast from './components/ui/AchievementToast.vue'
 import AdventureUnlockNotify from './components/ui/AdventureUnlockNotify.vue'
 import AppDialog from './components/ui/AppDialog.vue'
-import { initUIStore } from './stores/modules/ui/ui'
+import { initUIStore, useUIStore } from './stores/modules/ui/ui'
 import { i18n } from './locales'
 import { useSettingsStore } from './stores/modules/settings'
 import { useLlmProvidersStore } from './stores/modules/llm-providers'
@@ -50,7 +53,28 @@ useSedentaryReminder()
 // 把设置中的自定义字体名同步到 <html> 的 --font-app；
 // 为空时 base.css 中的回退栈 --font-sans 生效。初始菜单 / 加载页因自带
 // 显式 font-family 不会继承此变量，自动保持原有字体。
+const uiStore = useUIStore()
 const settingsStore = useSettingsStore()
+
+// 等待「入场问候」处理完成（后端在问候生成/跳过时发 entry:greeting-done），用于桌宠 loading。
+function waitEntryGreetingDone() {
+  return new Promise<void>((resolve) => {
+    let settled = false
+    let unlisten: (() => void) | null = null
+    const finish = () => {
+      if (settled) return
+      settled = true
+      unlisten?.()
+      resolve()
+    }
+    listen('entry:greeting-done', finish).then((u) => {
+      if (settled) u()
+      else unlisten = u
+    })
+    setTimeout(finish, 15000)
+  })
+}
+
 function applyFont(font?: string) {
   // 留空 → 软件默认（base.css 的 --font-sans 原版字体栈）
   document.documentElement.style.setProperty('--font-app', font ? `'${font}'` : '')
@@ -71,6 +95,8 @@ void getImportedFonts().then((fonts) => {
 // ─── 键盘处理 ────────────────────────────────────────────────
 
 const route = useRoute()
+const router = useRouter()
+const gameStore = useGameStore()
 
 // 仅主窗口挂载全局弹窗（通知/成就/对话确认），日志窗口等复用 App.vue 的窗口不弹
 const isMainWindow = getCurrentWindow().label === 'main'
@@ -112,6 +138,48 @@ function tryExit() {
 onMounted(async () => {
   // 初始化 UI Store（加载角色 tips）
   initUIStore()
+  const llmStore = useLlmProvidersStore()
+
+  // ─── 开机自启动 · 启动即桌宠 ─────────────────────────────
+  // 只在「系统开机自启」触发（带 --autostart 参数）且开启 boot_as_pet 时才进入桌宠；
+  // 手动双击 exe 不带 --autostart，一律走主菜单。
+  if (isMainWindow) {
+    try {
+      const auto = await getAutostartStatus()
+      // 全局：无论开机自启 / 手动启动、主菜单 / 桌宠，开启后都在对话场景默认开启自动播放
+      if (auto.auto_play) uiStore.autoMode = true
+      // 是否以桌宠进入：开机自启且开启桌宠，或（手动启动且开启“以桌宠模式启动”）
+      const wantPet =
+        (auto.launched_by_autostart && auto.boot_as_pet) ||
+        (!auto.launched_by_autostart && auto.startup_pet_mode)
+      if (wantPet) {
+        const petRoleId = Number(auto.pet_role_id) || 0
+        // 进入桌宠前标记「准备中」：在前端 LLM、TTS 服务与入场问候就绪前禁止对话
+        uiStore.petReady = false
+        uiStore.petBooting = true
+        // 若开启入场问候，先在触发之前注册「问候完成」监听，避免错过事件
+        const waitGreeting = auto.startup_greeting ? waitEntryGreetingDone() : Promise.resolve()
+        await gameStore.bootAsPet(petRoleId > 0 ? petRoleId : undefined, auto.startup_greeting)
+        const roleId =
+          gameStore.mainRoleId > 0 ? gameStore.mainRoleId : petRoleId > 0 ? petRoleId : null
+        if (auto.auto_play) uiStore.autoMode = true
+        router.push('/pet')
+        // 等「前端 LLM 配置」「外部 TTS 服务」「入场问候完成」都就绪
+        // （内置 TTS / 未配启动脚本 / 未开启问候时立即就绪）；并保证 loading 至少展示一小段。
+        Promise.all([
+          llmStore.load().catch(() => {}),
+          invoke('autostart_boot_apply', { roleId }).catch(() => {}),
+          waitGreeting,
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]).finally(() => {
+          uiStore.petReady = true
+          uiStore.petBooting = false
+        })
+      }
+    } catch (e) {
+      console.error('[Autostart] 启动即桌宠初始化失败:', e)
+    }
+  }
 
   // 启动时自动弹出独立日志窗口（仅主窗口触发，开关在日志页设置）
   if (
@@ -122,7 +190,6 @@ onMounted(async () => {
   }
 
   // 预加载 LLM 提供商配置，避免主界面因 store 未加载而误判未选择模型
-  const llmStore = useLlmProvidersStore()
   llmStore.load().catch((e) => console.error('加载 LLM 提供商失败:', e))
 
   // 供成就系统控制台测试用，在 window 对象中注册一些方法

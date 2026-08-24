@@ -1,25 +1,52 @@
 <template>
-  <div class="flex flex-col md:grid md:grid-cols-[min(30%,280px)_1fr] h-full min-h-0">
+  <div class="flex
+    flex-col
+    md:grid
+    md:grid-cols-[min(30%,280px)_1fr]
+    h-full
+    min-h-0">
     <!-- 导航菜单：宽屏始终可见；窄屏仅在浏览菜单层级时可见 -->
     <nav
       ref="navContainerRef"
       v-show="!uiStore.isNarrowScreen || narrowViewLevel === 'menu'"
       @click="() => removeMoreMenu()"
-      class="transition-all duration-300 ease-[cubic-bezier(0.18,0.89,0.32,1.00)] flex flex-col justify-start gap-6.25 overflow-y-auto relative border-b md:border-b-0 md:border-r border-brand md:moreMenu:left-0"
-      :class="[
-        'md:left-0',
-        'translate-y-0',
-        'moreMenu:translate-y-0',
-      ]"
+      class="transition-all
+        duration-300
+        ease-[cubic-bezier(0.18,0.89,0.32,1.00)]
+        flex
+        flex-col
+        justify-start
+        gap-6.25
+        overflow-y-auto
+        relative
+        border-b
+        md:border-b-0
+        md:border-r
+        border-brand
+        md:moreMenu:left-0"
+      :class="['md:left-0', 'translate-y-0', 'moreMenu:translate-y-0']"
     >
       <!-- 滑动指示器 -->
       <div
         ref="indicatorRef"
-        class="absolute left-2 w-[calc(100%-40px)] bg-brand rounded-lg z-0 transition-all duration-300 ease-[cubic-bezier(0.18,0.89,0.32,1.00)]"
+        class="absolute
+          left-2
+          w-[calc(100%-40px)]
+          bg-brand
+          rounded-lg
+          z-0
+          transition-all
+          duration-300
+          ease-[cubic-bezier(0.18,0.89,0.32,1.00)]"
       ></div>
 
       <div
-        class="flex items-center gap-1 mt-2 text-sm px-5"
+        class="flex
+          items-center
+          gap-1
+          mt-2
+          text-sm
+          px-5"
         style="color: white; -webkit-text-stroke: 1px black; paint-order: stroke fill"
       >
         {{ $t('settings.advanceOther.restartHint') }}
@@ -28,16 +55,47 @@
       <div
         v-for="(categoryData, categoryName) in configData"
         :key="categoryName"
-        class="flex flex-col gap-1 w-full"
+        class="flex
+          flex-col
+          gap-1
+          w-full"
       >
         <span
-          class="text-base font-bold px-3.75 py-2.5 block rounded-lg mb-1 text-brand bg-white/10 backdrop-blur-xl backdrop-saturate-150 border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.1)]"
-        >{{ catLabel(categoryName) }}</span>
+          class="text-base
+            font-bold
+            px-3.75
+            py-2.5
+            block
+            rounded-lg
+            mb-1
+            text-brand
+            bg-white/10
+            backdrop-blur-xl
+            backdrop-saturate-150
+            border
+            border-white/10
+            shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_1px_rgba(255,255,255,0.1)]"
+          >{{ catLabel(categoryName) }}</span
+        >
         <a
           v-for="(, subcategoryName) in categoryData.subcategories"
           :key="subcategoryName"
           href="#"
-          class="block px-5 py-3 no-underline rounded-lg text-white transition-colors duration-200 relative z-10 adv-nav-link hover:bg-gray-200 hover:text-black active:text-white active:font-bold"
+          class="block
+            px-5
+            py-3
+            no-underline
+            rounded-lg
+            text-white
+            transition-colors
+            duration-200
+            relative
+            z-10
+            adv-nav-link
+            hover:bg-gray-200
+            hover:text-black
+            active:text-white
+            active:font-bold"
           :class="{
             active: isActive(categoryName, subcategoryName.toString()),
           }"
@@ -51,31 +109,76 @@
     <!-- 设置内容区域：宽屏始终可见；窄屏仅在浏览内容层级时可见 -->
     <main
       v-show="!uiStore.isNarrowScreen || narrowViewLevel === 'content'"
-      class="flex justify-center h-full overflow-auto relative px-10 py-10 md:px-10 md:py-0"
-      :class="[
-        'translate-y-0',
-        'moreMenu:translate-y-0',
-      ]"
+      class="flex
+        justify-center
+        h-full
+        overflow-auto
+        relative
+        px-10
+        py-10
+        md:px-10
+        md:py-0"
+      :class="['translate-y-0', 'moreMenu:translate-y-0']"
     >
       <!-- 窄屏返回按钮 -->
       <button
         v-if="uiStore.isNarrowScreen"
-        class="absolute top-0 left-4 flex items-center gap-1.5 text-sm text-white/70 hover:text-white transition-colors py-1 px-2 rounded-lg hover:bg-white/10"
+        class="absolute
+          top-0
+          left-4
+          flex
+          items-center
+          gap-1.5
+          text-sm
+          text-white/70
+          hover:text-white
+          transition-colors
+          py-1
+          px-2
+          rounded-lg
+          hover:bg-white/10"
         @click="narrowViewLevel = 'menu'"
       >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        <svg
+          class="w-4
+            h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
         {{ $t('settings.advanceOther.backToList') }}
       </button>
-      <div v-if="selectedSubcategory" class="w-full active">
-        <div class="pt-2.5 overflow-auto">
-          <header class="pb-4 mb-6 border-b border-brand">
-            <h2 class="m-0 text-2xl text-brand font-semibold">
+      <div
+        v-if="selectedSubcategory"
+        class="w-full
+          active"
+      >
+        <div class="pt-2.5
+          overflow-auto">
+          <header class="pb-4
+            mb-6
+            border-b
+            border-brand">
+            <h2 class="m-0
+              text-2xl
+              text-brand
+              font-semibold">
               {{ subLabel(activeSelection.subcategory ?? '') }}
             </h2>
-            <p class="mt-2 text-base">
+            <p class="mt-2
+              text-base">
               {{
                 subDesc(activeSelection.subcategory ?? '', selectedSubcategory.description) ||
-                $t('settings.advanceOther.subcategoryDesc', { name: subLabel(activeSelection.subcategory ?? '') })
+                $t('settings.advanceOther.subcategoryDesc', {
+                  name: subLabel(activeSelection.subcategory ?? ''),
+                })
               }}
             </p>
           </header>
@@ -95,45 +198,200 @@
 
           <section
             v-if="activeSelection.category === 'TTS 配置'"
-            class="mb-6 rounded-xl border border-white/10 bg-black/15 p-4"
+            class="mb-6
+              rounded-xl
+              border
+              border-white/10
+              bg-black/15
+              p-4"
           >
-            <h3 class="mb-1 text-base font-semibold text-white">{{ $t('settings.advanceOther.ttsControl.title') }}</h3>
-            <p class="mb-3 text-sm leading-6 text-white/65">
+            <h3 class="mb-1
+              text-base
+              font-semibold
+              text-white">
+              {{ $t('settings.advanceOther.ttsControl.title') }}
+            </h3>
+            <p class="mb-3
+              text-sm
+              leading-6
+              text-white/65">
               {{ $t('settings.advanceOther.ttsControl.desc') }}
             </p>
-            <Button type="big" :disabled="isReconnectingTts" @click="forceReconnectTts">
-              <RefreshCw :size="18" :class="{ 'animate-spin': isReconnectingTts }" />
-              {{ isReconnectingTts ? $t('settings.advanceOther.ttsControl.reconnecting') : $t('settings.advanceOther.ttsControl.forceReconnect') }}
+            <Button
+              type="big"
+              :disabled="isReconnectingTts"
+              @click="forceReconnectTts"
+            >
+              <RefreshCw
+                :size="18"
+                :class="{ 'animate-spin': isReconnectingTts }"
+              />
+              {{
+                isReconnectingTts
+                  ? $t('settings.advanceOther.ttsControl.reconnecting')
+                  : $t('settings.advanceOther.ttsControl.forceReconnect')
+              }}
             </Button>
             <p
               v-if="reconnectStatus.message"
-              class="mt-2 text-sm"
+              class="mt-2
+                text-sm"
               :class="reconnectStatus.colorClass"
             >
               {{ reconnectStatus.message }}
             </p>
           </section>
 
+          <!-- 开机自启动控制（仅「启动项 → 开机自启动」子分类显示） -->
+          <section
+            v-if="activeSelection.category === '启动项' && activeSelection.subcategory === '开机自启动'"
+            class="mb-6
+              rounded-xl
+              border
+              border-white/10
+              bg-black/15
+              p-4"
+          >
+            <h3 class="mb-1
+              text-base
+              font-semibold
+              text-white">
+              {{ $t('settings.advanceOther.autostart.title') }}
+            </h3>
+            <p class="mb-3
+              text-sm
+              leading-6
+              text-white/65">
+              {{ $t('settings.advanceOther.autostart.desc') }}
+            </p>
+
+            <div class="flex
+              items-center
+              gap-3
+              mb-4">
+              <Button
+                type="big"
+                :disabled="togglingAutostart"
+                @click="toggleAutostart"
+              >
+                {{
+                  systemEnabled
+                    ? $t('settings.advanceOther.autostart.disable')
+                    : $t('settings.advanceOther.autostart.enable')
+                }}
+              </Button>
+              <span
+                class="text-sm"
+                :class="systemEnabled ? 'text-green-400' : 'text-white/50'"
+              >
+                {{
+                  $t('settings.advanceOther.autostart.status', {
+                    status: systemEnabled
+                      ? $t('settings.advanceOther.autostart.on')
+                      : $t('settings.advanceOther.autostart.off'),
+                  })
+                }}
+              </span>
+            </div>
+
+            <div class="flex
+              flex-col
+              gap-2">
+              <label class="text-sm
+                text-white/80">{{
+                $t('settings.advanceOther.autostart.defaultRole')
+              }}</label>
+              <select
+                v-model="selectedRoleId"
+                @change="applySelectedRole"
+                class="px-3
+                  py-2.5
+                  rounded-lg
+                  text-sm
+                  text-white
+                  bg-white/10
+                  border
+                  border-white/10
+                  focus:outline-none
+                  focus:border-brand
+                  focus:ring-2
+                  focus:ring-brand/20
+                  transition-all
+                  duration-200"
+              >
+                <option
+                  value=""
+                  class="bg-black/60"
+                >
+                  {{ $t('settings.advanceOther.autostart.noRole') }}
+                </option>
+                <option
+                  v-for="c in characters"
+                  :key="c.character_id"
+                  :value="c.character_id"
+                  class="bg-black/60"
+                >
+                  {{ c.title }}
+                </option>
+              </select>
+            </div>
+
+            <p class="mt-3
+              text-xs
+              text-white/45">
+              {{ $t('settings.advanceOther.autostart.roleHint') }}
+            </p>
+          </section>
+
           <!-- 保存操作区域 -->
           <div
-            class="inline-flex flex-col gap-2 px-5 py-2.5 bg-brand text-white border-none rounded-lg cursor-pointer text-sm font-medium transition-colors duration-200 hover:bg-[#0056b3] min-w-30"
+            class="inline-flex
+              flex-col
+              gap-2
+              px-5
+              py-2.5
+              bg-brand
+              text-white
+              border-none
+              rounded-lg
+              cursor-pointer
+              text-sm
+              font-medium
+              transition-colors
+              duration-200
+              hover:bg-[#0056b3]
+              min-w-30"
             @click="saveSettings"
           >
             <button
-              class="bg-transparent border-none text-white cursor-pointer p-0 m-0 w-full h-full"
+              class="bg-transparent
+                border-none
+                text-white
+                cursor-pointer
+                p-0
+                m-0
+                w-full
+                h-full"
             >
               {{ $t('settings.advanceOther.saveButton') }}
             </button>
             <p
               :class="saveStatus.colorClass"
-              class="text-xs whitespace-normal wrap-break-word max-w-75"
+              class="text-xs
+                whitespace-normal
+                wrap-break-word
+                max-w-75"
             >
               {{ saveStatus.message }}
             </p>
           </div>
         </div>
       </div>
-      <div v-else-if="!isLoading && !Object.keys(configData).length" class="w-full active">
+      <div
+        v-else-if="!isLoading && !Object.keys(configData).length"
+        class="w-full
+          active"
+      >
         <div class="advanced-settings-container">
           <header>
             <h2 class="adv-title">{{ $t('settings.advanceOther.loadFailed') }}</h2>
@@ -151,8 +409,14 @@ import { useI18n } from 'vue-i18n'
 import { useUIStore } from '@/stores/modules/ui/ui'
 import SettingItem from '@/components/base/items/SettingItem.vue'
 import { Button } from '@/components/base'
-import { getEnvConfigSettings, saveEnvConfigSettings } from '@/api/services/config'
+import {
+  getEnvConfigSettings,
+  saveEnvConfigSettings,
+  getAutostartStatus,
+  setAutostartEnabled,
+} from '@/api/services/config'
 import { reactivateTTS } from '@/api/services/game-info'
+import { characterGetAll } from '@/api/services/character'
 import { switchLlm } from '@/api/services/llm-providers'
 import { RefreshCw } from 'lucide-vue-next'
 
@@ -163,7 +427,9 @@ const { t, te } = useI18n()
 // 后端配置树的分类/子类/设置项描述均为中文（config/tree.rs），
 // 这里按名称/键查 i18n 词条做界面日文化；查不到时回退后端原文。
 const catLabel = (name: string) =>
-  te(`settings.advanceOther.categories.${name}`) ? t(`settings.advanceOther.categories.${name}`) : name
+  te(`settings.advanceOther.categories.${name}`)
+    ? t(`settings.advanceOther.categories.${name}`)
+    : name
 const subLabel = (name: string) =>
   te(`settings.advanceOther.subcategories.${name}`)
     ? t(`settings.advanceOther.subcategories.${name}`)
@@ -195,6 +461,13 @@ const reconnectStatus = reactive({
   colorClass: 'text-green-400',
 })
 let reconnectStatusTimer: ReturnType<typeof setTimeout> | null = null
+
+// --- 开机自启动控制状态 ---
+const systemEnabled = ref(false)
+const togglingAutostart = ref(false)
+const characters = ref<{ character_id: string; title: string }[]>([])
+const selectedRoleId = ref<string>('')
+let autostartLoaded = false
 
 const emit = defineEmits<{
   'remove-more-menu-from-b': []
@@ -285,6 +558,46 @@ const forceReconnectTts = async () => {
   }
 }
 
+// --- 开机自启动面板逻辑 ---
+const loadAutostartPanel = async () => {
+  if (autostartLoaded) return
+  autostartLoaded = true
+  try {
+    const status = await getAutostartStatus()
+    systemEnabled.value = status.system_enabled
+    const chars = await characterGetAll(1, 100)
+    characters.value = chars.items.map((c) => ({
+      character_id: String(c.character_id),
+      title: c.title,
+    }))
+    selectedRoleId.value = status.pet_role_id
+  } catch (error) {
+    console.error('[Autostart] 载入开机自启状态失败:', error)
+  }
+}
+
+const applySelectedRole = async () => {
+  try {
+    await saveEnvConfigSettings({ 'autostart.pet_role_id': selectedRoleId.value })
+  } catch (error) {
+    console.error('[Autostart] 保存默认启动角色失败:', error)
+  }
+}
+
+const toggleAutostart = async () => {
+  if (togglingAutostart.value) return
+  togglingAutostart.value = true
+  try {
+    const target = !systemEnabled.value
+    await setAutostartEnabled(target)
+    systemEnabled.value = target
+  } catch (error) {
+    console.error('[Autostart] 切换开机自启失败:', error)
+  } finally {
+    togglingAutostart.value = false
+  }
+}
+
 const loadConfig = async (selectFirst = true) => {
   isLoading.value = true
   try {
@@ -347,6 +660,9 @@ watch(
   async () => {
     await nextTick()
     updateIndicatorPosition()
+    if (activeSelection.category === '启动项' && activeSelection.subcategory === '开机自启动') {
+      void loadAutostartPanel()
+    }
   },
   { deep: true },
 )

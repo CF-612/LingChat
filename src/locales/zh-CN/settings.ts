@@ -160,6 +160,18 @@ export default {
       reconnecting: '正在重新连接…',
       forceReconnect: '强制重新连接 TTS',
     },
+    autostart: {
+      title: '系统自启动',
+      desc: '开启后，LingChat 会写入系统开机自启动项，随开机自动启动。上方「启动即桌宠」决定开机后是否直接进入桌宠模式；外部 TTS 模式还可配置启动脚本，开机自动拉起语音服务。',
+      enable: '开启系统自启',
+      disable: '关闭系统自启',
+      status: '当前系统自启状态：{status}',
+      on: '已开启',
+      off: '未开启',
+      defaultRole: '默认启动角色',
+      noRole: '（沿用上次角色）',
+      roleHint: '选择后会自动保存，开机将默认加载该角色。',
+    },
     saveButton: '保存',
     loadFailed: '加载失败',
     loadFailedDesc: '无法加载配置或配置为空。',
@@ -172,52 +184,61 @@ export default {
     },
     categories: {
       'LLM 配置': 'LLM 配置',
-      '翻译配置': '翻译配置',
-      '功能设置': '功能设置',
+      翻译配置: '翻译配置',
+      功能设置: '功能设置',
       'TTS 配置': 'TTS 配置',
-      '创意工坊': '创意工坊',
-      '日志配置': '日志配置',
-      '主动对话配置': '主动对话配置',
+      创意工坊: '创意工坊',
+      日志配置: '日志配置',
+      主动对话配置: '主动对话配置',
+      启动项: '启动项',
     },
     subcategories: {
-      '高级选项': '高级选项',
-      '功能选项': '功能选项',
-      '对话增强': '对话增强',
-      '记忆系统': '记忆系统',
+      高级选项: '高级选项',
+      功能选项: '功能选项',
+      对话增强: '对话增强',
+      记忆系统: '记忆系统',
       '适配器 URL': '适配器 URL',
-      '音频参数': '音频参数',
+      音频参数: '音频参数',
       'GitHub Token': 'GitHub Token',
-      '基础设置': '基础设置',
-      '基础开关': '基础开关',
-      '视觉感知设置': '视觉感知设置',
-      '感知与话题配置': '感知与话题配置',
+      基础设置: '基础设置',
+      基础开关: '基础开关',
+      视觉感知设置: '视觉感知设置',
+      感知与话题配置: '感知与话题配置',
+      开机自启动: '开机自启动',
+       启动设置: '启动设置',
     },
     subcategoryDescs: {
-      '高级选项': '调优 AI 对话行为的高级参数',
-      '功能选项': '翻译功能的开关与行为控制',
-      '对话增强': '这里可以设置是否启用时间感知和情绪分类器功能',
-      '记忆系统': '在这里设定你想要的永久记忆效果',
-      '适配器 URL': '各个 TTS 后端的 API 地址，对应原环境变量 SIMPLE_VITS_API_URL / STYLE_BERT_VITS2_URL 等',
-      '音频参数': 'TTS 音频输出格式与语言设置，对应原环境变量 TTS_AUDIO_FORMAT / VOICE_LANG',
-      'GitHub Token': '配置 GitHub Personal Access Token 以获取准确的 Discussion upvote 热度排序（可选）',
-      '基础设置': '程序运行时文件日志的相关设置',
-      '基础开关': '主动对话功能的核心开关与触发频率设置',
-      '视觉感知设置': '主动对话时的桌面视觉感知开关与触发权重，视觉模型在大模型管理中配置',
-      '感知与话题配置': '日程、TODO与随机对话的权重及开关配置',
+      高级选项: '调优 AI 对话行为的高级参数',
+      功能选项: '翻译功能的开关与行为控制',
+      对话增强: '这里可以设置是否启用时间感知和情绪分类器功能',
+      记忆系统: '在这里设定你想要的永久记忆效果',
+      '适配器 URL':
+        '各个 TTS 后端的 API 地址，对应原环境变量 SIMPLE_VITS_API_URL / STYLE_BERT_VITS2_URL 等',
+      音频参数: 'TTS 音频输出格式与语言设置，对应原环境变量 TTS_AUDIO_FORMAT / VOICE_LANG',
+      'GitHub Token':
+        '配置 GitHub Personal Access Token 以获取准确的 Discussion upvote 热度排序（可选）',
+      基础设置: '程序运行时文件日志的相关设置',
+      基础开关: '主动对话功能的核心开关与触发频率设置',
+      视觉感知设置: '主动对话时的桌面视觉感知开关与触发权重，视觉模型在大模型管理中配置',
+      感知与话题配置: '日程、TODO与随机对话的权重及开关配置',
+      开机自启动: '开机后自动启动 LingChat',
+       启动设置: '控制 LingChat 的启动方式与默认行为',
     },
     fields: {
       llm: {
         output_sec_lang: 'LLM_OUTPUT_SEC_LANG — 是否允许输出第二语言（关闭后仅输出中文）',
         consumers: 'COMSUMERS — 并发消费者数量（增大可加速流式输出，默认 3）',
         timeout_secs: 'LLM 请求空闲超时（秒）— 首次响应及流式相邻事件最长等待时间（10–3600）',
-        no_emotion_limit_prompt: 'NO_EMOTION_LIMIT_PROMPT — 解除 emotion 数量限制（可能增加 token 消耗）',
+        no_emotion_limit_prompt:
+          'NO_EMOTION_LIMIT_PROMPT — 解除 emotion 数量限制（可能增加 token 消耗）',
       },
       translate: {
         enable: 'ENABLE_TRANSLATE — 启用 AI 翻译（将中文对话翻译为第二语言）',
       },
       features: {
         enable_time_sense: 'USE_TIME_SENSE — 启用时间感知（根据上下文时间添加系统提醒）',
-        enable_emotion_classifier: 'ENABLE_EMOTION_CLASSIFIER — 启用情感分类器（ONNX 模型，用于自动标注对话 emotion）',
+        enable_emotion_classifier:
+          'ENABLE_EMOTION_CLASSIFIER — 启用情感分类器（ONNX 模型，用于自动标注对话 emotion）',
         use_persistent_memory: 'USE_PERSISTENT_MEMORY — 开启后记忆会自动压缩，减少 token 消耗',
         memory_update_interval: 'MEMORY_UPDATE_INTERVAL — 触发记忆摘要的新消息数（默认 250）',
         memory_recent_window: 'MEMORY_RECENT_WINDOW — 摘要时保留的最近消息数（默认 30）',
@@ -240,24 +261,41 @@ export default {
         audio_format: '音频文件格式（wav / mp3 / flac / ogg 等）',
       },
       workshop: {
-        github_token: '填入你的 GitHub Token（无需任何权限，仅用于调用 GraphQL API）。留空使用 REST API，无法获取独立 upvote 数（会用 👍 表情数代替）。Token 创建地址：https://github.com/settings/tokens',
+        github_token:
+          '填入你的 GitHub Token（无需任何权限，仅用于调用 GraphQL API）。留空使用 REST API，无法获取独立 upvote 数（会用 👍 表情数代替）。Token 创建地址：https://github.com/settings/tokens',
       },
       log: {
         enable: 'LOG_ENABLE — 是否将运行日志写入文件（位于 data/log/app/ 目录）',
         retention_days: 'LOG_RETENTION_DAYS — 日志文件保留天数，超过的旧文件在启动时自动清理',
-        llm_request_body: 'LOG_LLM_REQUEST_BODY — 记录每次 LLM 请求的完整请求体 JSON 到 data/log/llm/ 目录（默认关闭）',
-        genai_debug: 'LOG_GENAI_DEBUG — 开启 genai SDK 的调试日志（含请求/响应细节，保存后即时生效，默认关闭）',
+        llm_request_body:
+          'LOG_LLM_REQUEST_BODY — 记录每次 LLM 请求的完整请求体 JSON 到 data/log/llm/ 目录（默认关闭）',
+        genai_debug:
+          'LOG_GENAI_DEBUG — 开启 genai SDK 的调试日志（含请求/响应细节，保存后即时生效，默认关闭）',
+      },
+      autostart: {
+        enabled: '开启后，LingChat 将写入系统开机自启动项，随开机自动启动（仅桌面端）',
+        boot_as_pet: '以桌宠模式启动：开启后，开机自启动时以桌宠模式进入（仅 Windows 可用）',
+        pet_role_id: '开机自启动默认加载的角色 ID（留空则沿用上次游玩的角色）',
+        tts_launcher_bat:
+          '外部 TTS 模式的启动脚本（.bat）路径，用于开机时拉起自托管语音服务；内置本地 TTS 引擎可留空',
+      },
+      startup: {
+        pet_mode: '以桌宠模式启动：开启后，手动点击 exe 启动时直接进入桌宠模式（与「开机自启动」里的桌宠开关相互独立，仅 Windows 可用）',
+        auto_play: '默认自动播放对话：开启后，在对话场景会默认开启自动播放对话开关（全局生效）',
+        greeting: '入场问候：开启后，角色会主动先发出问候',
       },
       ENABLE_PROACTIVE_SYSTEM: 'ENABLE_PROACTIVE_SYSTEM — 是否启用主动对话系统',
       MAX_PROACTIVE_TIMES: 'MAX_PROACTIVE_TIMES — 在用户响应之前，能主动对话的次数',
-      ENABLE_VISUAL_PRECEPTION: 'ENABLE_VISUAL_PRECEPTION — 是否允许主动视觉感知桌面画面（偷看屏幕）',
+      ENABLE_VISUAL_PRECEPTION:
+        'ENABLE_VISUAL_PRECEPTION — 是否允许主动视觉感知桌面画面（偷看屏幕）',
       SCREEN_WEIGHT: 'SCREEN_WEIGHT — 视觉模式触发权重（越大越容易偷看屏幕聊天，默认 30）',
       ENABLE_TOPIC_CREATER: 'ENABLE_TOPIC_CREATER — 允许自主寻找并开启新话题',
       TOPIC_WEIGHT: 'TOPIC_WEIGHT — 随机话题触发权重（默认 60）',
       ENABLE_TODO_PRECEPTION: 'ENABLE_TODO_PRECEPTION — 允许在闲暇时自动读取未完成 TODO 并温和提醒',
       TODO_WEIGHT: 'TODO_WEIGHT — TODO 提醒触发权重（默认 10）',
       ENABLE_SCHEDULE_REMINDER: 'ENABLE_SCHEDULE_REMINDER — 启用强日程日程报时弹窗提醒',
-      ENABLE_IMPORTANT_DAY_REMINDER: 'ENABLE_IMPORTANT_DAY_REMINDER — 启用重要节日与特殊日子暖心提醒',
+      ENABLE_IMPORTANT_DAY_REMINDER:
+        'ENABLE_IMPORTANT_DAY_REMINDER — 启用重要节日与特殊日子暖心提醒',
     },
   },
   workshop: {
@@ -401,7 +439,8 @@ export default {
     delete: {
       button: '删除角色',
       confirmTitle: '删除角色',
-      confirmMessage: '确定要删除角色「{title}」吗？\n此操作会同时删除该角色的所有存档，记忆和角色文件。\n\n此操作不可撤销。',
+      confirmMessage:
+        '确定要删除角色「{title}」吗？\n此操作会同时删除该角色的所有存档，记忆和角色文件。\n\n此操作不可撤销。',
       successTitle: '删除成功',
       successMessage: '角色「{title}」已删除',
       failTitle: '删除失败',
@@ -726,10 +765,12 @@ export default {
     },
     engineDownload: {
       title: '语音推理引擎下载（SBV2）',
-      cpuHint: 'CPU 推理使用的是 SBV2-API，需要在 settings.yml 中把 sbv2 换成 sbv2api，人物设定也能改',
+      cpuHint:
+        'CPU 推理使用的是 SBV2-API，需要在 settings.yml 中把 sbv2 换成 sbv2api，人物设定也能改',
       cpu: 'CPU推理',
       nvidia: 'N卡推理',
-      amdHint: 'A 卡推理使用的是 SBV2-API，需要在 settings.yml 中把 sbv2 换成 sbv2api，人物设定也能改',
+      amdHint:
+        'A 卡推理使用的是 SBV2-API，需要在 settings.yml 中把 sbv2 换成 sbv2api，人物设定也能改',
       amd: 'A卡推理',
     },
     back: {
@@ -1041,12 +1082,15 @@ export default {
       deleteDebertaSuccess: 'DeBERTa 已删除',
       deleteDebertaFailed: '删除 DeBERTa 失败：{error}',
       enableHintTitle: '本地 TTS 已开启',
-      enableHintMessage: '本地 TTS 开启后，请到角色语音设置 TTS 类型选择「本地 SBV2 API」和本地语音ID',
+      enableHintMessage:
+        '本地 TTS 开启后，请到角色语音设置 TTS 类型选择「本地 SBV2 API」和本地语音ID',
       previewFailed: '试听失败：{error}',
       readSwitchFailed: '读取本地 TTS 开关失败：{error}',
       switchEnabled: '本地 TTS 已启用。',
-      switchEnabledNotReady: '本地 TTS 已启用，但引擎未就绪（缺少 DeBERTa 模型或分词器，请先下载）。',
+      switchEnabledNotReady:
+        '本地 TTS 已启用，但引擎未就绪（缺少 DeBERTa 模型或分词器，请先下载）。',
       switchDisabled: '本地 TTS 已关闭，如需使用云端 TTS，请将角色语音切换为“云端”并重启应用。',
       saveSwitchFailed: '保存本地 TTS 开关失败：{error}',
     },
-  },}
+  },
+}

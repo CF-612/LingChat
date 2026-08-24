@@ -1,5 +1,6 @@
 pub mod achievement;
 pub mod adventure;
+pub mod autostart;
 pub mod ambient;
 pub mod asset;
 pub mod background;

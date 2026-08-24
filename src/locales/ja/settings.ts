@@ -17,7 +17,8 @@ export default {
     generateVoiceFailed: '音声の生成に失敗：{error}',
     you: 'あなた',
     mysteryVoice: '謎の声',
-    backtrackConfirm: 'この会話まで巻き戻しますか？このメッセージ以降のすべての会話が消去され、元に戻せません。',
+    backtrackConfirm:
+      'この会話まで巻き戻しますか？このメッセージ以降のすべての会話が消去され、元に戻せません。',
     backtrackConfirmTitle: '巻き戻しの確認',
     backtrackFailed: '巻き戻しに失敗しました：{error}',
     emotionTitle: '感情: {tag}',
@@ -159,6 +160,18 @@ export default {
       reconnecting: '再接続中…',
       forceReconnect: 'TTS を強制再接続',
     },
+    autostart: {
+      title: 'システム自動起動',
+      desc: 'オンにすると LingChat がシステムの起動項目に登録され、起動時に自動で立ち上がります。上の「ペットで起動」で起動時に直接ペットモードで開くかを制御します。外部 TTS モードでは起動スクリプトを設定して音声サービスを自動起動できます。',
+      enable: 'システム自動起動を有効化',
+      disable: 'システム自動起動を無効化',
+      status: '現在のシステム自動起動状態：{status}',
+      on: '有効',
+      off: '無効',
+      defaultRole: 'デフォルト起動ロール',
+      noRole: '（前回のロールを継続）',
+      roleHint: '選択すると自動で保存され、起動時にこのロールが読み込まれます。',
+    },
     saveButton: '保存',
     loadFailed: '読み込み失敗',
     loadFailedDesc: '設定を読み込めないか、設定が空です。',
@@ -171,55 +184,73 @@ export default {
     },
     categories: {
       'LLM 配置': 'LLM 設定',
-      '翻译配置': '翻訳設定',
-      '功能设置': '機能設定',
+      翻译配置: '翻訳設定',
+      功能设置: '機能設定',
       'TTS 配置': 'TTS 設定',
-      '创意工坊': 'ワークショップ',
-      '日志配置': 'ログ設定',
-      '主动对话配置': '自動会話設定',
+      创意工坊: 'ワークショップ',
+      日志配置: 'ログ設定',
+      主动对话配置: '自動会話設定',
+      启动项: '起動項目',
     },
     subcategories: {
-      '高级选项': '詳細オプション',
-      '功能选项': '機能オプション',
-      '对话增强': '会話強化',
-      '记忆系统': '記憶システム',
+      高级选项: '詳細オプション',
+      功能选项: '機能オプション',
+      对话增强: '会話強化',
+      记忆系统: '記憶システム',
       '适配器 URL': 'アダプター URL',
-      '音频参数': '音声パラメータ',
+      音频参数: '音声パラメータ',
       'GitHub Token': 'GitHub トークン',
-      '基础设置': '基本設定',
-      '基础开关': '基本スイッチ',
-      '视觉感知设置': '視覚認識設定',
-      '感知与话题配置': '認識・話題設定',
+      基础设置: '基本設定',
+      基础开关: '基本スイッチ',
+      视觉感知设置: '視覚認識設定',
+      感知与话题配置: '認識・話題設定',
+      开机自启动: 'ペットで自動起動',
+       启动设置: '起動設定',
     },
     subcategoryDescs: {
-      '高级选项': 'AI の会話動作を調整する詳細パラメータ',
-      '功能选项': '翻訳機能のオン/オフと動作制御',
-      '对话增强': '時間認識と感情分類器の有効/無効を設定できます',
-      '记忆系统': 'お好みの長期記憶の効果を設定できます',
-      '适配器 URL': '各 TTS バックエンドの API アドレス（旧環境変数 SIMPLE_VITS_API_URL / STYLE_BERT_VITS2_URL などに相当）',
-      '音频参数': 'TTS 音声出力フォーマットと言語設定（旧環境変数 TTS_AUDIO_FORMAT / VOICE_LANG に相当）',
-      'GitHub Token': 'Discussion の upvote 人気順を正確に取得するための GitHub Personal Access Token（任意）',
-      '基础设置': '実行時のファイルログ関連の設定',
-      '基础开关': '自動会話機能のコアスイッチと発動頻度の設定',
-      '视觉感知设置': '自動会話時のデスクトップ視覚認識スイッチと発動重み。視覚モデルはモデル管理で設定',
-      '感知与话题配置': 'スケジュール・TODO・ランダム会話の重みとスイッチ設定',
+      高级选项: 'AI の会話動作を調整する詳細パラメータ',
+      功能选项: '翻訳機能のオン/オフと動作制御',
+      对话增强: '時間認識と感情分類器の有効/無効を設定できます',
+      记忆系统: 'お好みの長期記憶の効果を設定できます',
+      '适配器 URL':
+        '各 TTS バックエンドの API アドレス（旧環境変数 SIMPLE_VITS_API_URL / STYLE_BERT_VITS2_URL などに相当）',
+      音频参数:
+        'TTS 音声出力フォーマットと言語設定（旧環境変数 TTS_AUDIO_FORMAT / VOICE_LANG に相当）',
+      'GitHub Token':
+        'Discussion の upvote 人気順を正確に取得するための GitHub Personal Access Token（任意）',
+      基础设置: '実行時のファイルログ関連の設定',
+      基础开关: '自動会話機能のコアスイッチと発動頻度の設定',
+      视觉感知设置:
+        '自動会話時のデスクトップ視覚認識スイッチと発動重み。視覚モデルはモデル管理で設定',
+      感知与话题配置: 'スケジュール・TODO・ランダム会話の重みとスイッチ設定',
+      开机自启动:
+        '起動時に LingChat を自動起動します',
+       启动设置: 'LingChat の起動方法とデフォルト動作を制御します',
     },
     fields: {
       llm: {
         output_sec_lang: 'LLM_OUTPUT_SEC_LANG — 第二言語の出力を許可（オフで中国語のみ）',
-        consumers: 'COMSUMERS — 同時コンシューマー数（増やすとストリーム出力が高速化、デフォルト 3）',
-        timeout_secs: 'LLM リクエストのアイドルタイムアウト（秒）— 初回応答およびストリーム隣接イベントの最大待機時間（10–3600）',
-        no_emotion_limit_prompt: 'NO_EMOTION_LIMIT_PROMPT — emotion 数制限を解除（トークン消費が増える場合あり）',
+        consumers:
+          'COMSUMERS — 同時コンシューマー数（増やすとストリーム出力が高速化、デフォルト 3）',
+        timeout_secs:
+          'LLM リクエストのアイドルタイムアウト（秒）— 初回応答およびストリーム隣接イベントの最大待機時間（10–3600）',
+        no_emotion_limit_prompt:
+          'NO_EMOTION_LIMIT_PROMPT — emotion 数制限を解除（トークン消費が増える場合あり）',
       },
       translate: {
         enable: 'ENABLE_TRANSLATE — AI 翻訳を有効化（中国語会話を第二言語に翻訳）',
       },
       features: {
-        enable_time_sense: 'USE_TIME_SENSE — 時間認識を有効化（コンテキストの時刻に応じてシステムリマインドを追加）',
-        enable_emotion_classifier: 'ENABLE_EMOTION_CLASSIFIER — 感情分類器を有効化（ONNX モデル、会話 emotion の自動タグ付け）',
-        use_persistent_memory: 'USE_PERSISTENT_MEMORY — オンにすると記憶が自動圧縮されトークン消費を削減',
-        memory_update_interval: 'MEMORY_UPDATE_INTERVAL — 記憶要約を発動する新規メッセージ数（デフォルト 250）',
-        memory_recent_window: 'MEMORY_RECENT_WINDOW — 要約時に保持する直近メッセージ数（デフォルト 30）',
+        enable_time_sense:
+          'USE_TIME_SENSE — 時間認識を有効化（コンテキストの時刻に応じてシステムリマインドを追加）',
+        enable_emotion_classifier:
+          'ENABLE_EMOTION_CLASSIFIER — 感情分類器を有効化（ONNX モデル、会話 emotion の自動タグ付け）',
+        use_persistent_memory:
+          'USE_PERSISTENT_MEMORY — オンにすると記憶が自動圧縮されトークン消費を削減',
+        memory_update_interval:
+          'MEMORY_UPDATE_INTERVAL — 記憶要約を発動する新規メッセージ数（デフォルト 250）',
+        memory_recent_window:
+          'MEMORY_RECENT_WINDOW — 要約時に保持する直近メッセージ数（デフォルト 30）',
       },
       tts: {
         simple_vits_api_url: 'Simple-Vits-API アドレス（VITS アダプター）',
@@ -239,24 +270,46 @@ export default {
         audio_format: '音声ファイル形式（wav / mp3 / flac / ogg など）',
       },
       workshop: {
-        github_token: 'GitHub Token を入力（権限不要、GraphQL API 呼び出し用）。空欄なら REST API を使用し、独立 upvote 数は取得できません（👍 絵文字数で代替）。作成先: https://github.com/settings/tokens',
+        github_token:
+          'GitHub Token を入力（権限不要、GraphQL API 呼び出し用）。空欄なら REST API を使用し、独立 upvote 数は取得できません（👍 絵文字数で代替）。作成先: https://github.com/settings/tokens',
       },
       log: {
         enable: 'LOG_ENABLE — 実行ログをファイルに書き込む（data/log/app/ ディレクトリ）',
         retention_days: 'LOG_RETENTION_DAYS — ログファイルの保持日数。超過分は起動時に自動削除',
-        llm_request_body: 'LOG_LLM_REQUEST_BODY — 各 LLM リクエストの完全な JSON を data/log/llm/ に記録（デフォルトオフ）',
-        genai_debug: 'LOG_GENAI_DEBUG — genai SDK のデバッグログを有効化（リクエスト/レスポンス詳細、保存後すぐ有効、デフォルトオフ）',
+        llm_request_body:
+          'LOG_LLM_REQUEST_BODY — 各 LLM リクエストの完全な JSON を data/log/llm/ に記録（デフォルトオフ）',
+        genai_debug:
+          'LOG_GENAI_DEBUG — genai SDK のデバッグログを有効化（リクエスト/レスポンス詳細、保存後すぐ有効、デフォルトオフ）',
+      },
+      autostart: {
+        enabled:
+          'オンにすると LingChat がシステムの起動項目に登録され、起動時に自動で立ち上がります（デスクトップのみ）',
+        boot_as_pet:
+          'ペットモードで起動：オンにすると、自動起動で起動した場合にペットモードで開きます（Windows のみ）',
+        pet_role_id: '自動起動時に読み込むデフォルトのロール ID（空欄なら前回遊んだロールを継続）',
+        tts_launcher_bat:
+          '外部 TTS モードの起動スクリプト（.bat）パス。起動時に自前の音声サービスを立ち上げるために使用。内蔵ローカル TTS エンジンなら空欄で可',
+      },
+      startup: {
+        pet_mode: 'ペットモードで起動：オンにすると、exe を手動で起動した際に直接ペットモードで開きます（「ペットで自動起動」のペットスイッチとは独立、Windows のみ）',
+        auto_play: '自動会話を再生：オンにすると、会話シーンでデフォルトで自動再生スイッチがオンになります（全体で有効）',
+        greeting: '入場の挨拶：オンにすると、キャラクターが先に挨拶します',
       },
       ENABLE_PROACTIVE_SYSTEM: 'ENABLE_PROACTIVE_SYSTEM — 自動会話システムを有効にするか',
       MAX_PROACTIVE_TIMES: 'MAX_PROACTIVE_TIMES — ユーザーが応答するまでの自動会話の最大回数',
-      ENABLE_VISUAL_PRECEPTION: 'ENABLE_VISUAL_PRECEPTION — デスクトップ画面の自動視覚認識を許可（画面をのぞき見）',
-      SCREEN_WEIGHT: 'SCREEN_WEIGHT — 視覚モード発動の重み（大きいほど画面を見て話しかけやすい、デフォルト 30）',
+      ENABLE_VISUAL_PRECEPTION:
+        'ENABLE_VISUAL_PRECEPTION — デスクトップ画面の自動視覚認識を許可（画面をのぞき見）',
+      SCREEN_WEIGHT:
+        'SCREEN_WEIGHT — 視覚モード発動の重み（大きいほど画面を見て話しかけやすい、デフォルト 30）',
       ENABLE_TOPIC_CREATER: 'ENABLE_TOPIC_CREATER — 新しい話題を自律的に探して開始することを許可',
       TOPIC_WEIGHT: 'TOPIC_WEIGHT — ランダム話題の発動重み（デフォルト 60）',
-      ENABLE_TODO_PRECEPTION: 'ENABLE_TODO_PRECEPTION — 暇な時に未完了 TODO を自動で読み取り穏やかにリマインド',
+      ENABLE_TODO_PRECEPTION:
+        'ENABLE_TODO_PRECEPTION — 暇な時に未完了 TODO を自動で読み取り穏やかにリマインド',
       TODO_WEIGHT: 'TODO_WEIGHT — TODO リマインドの発動重み（デフォルト 10）',
-      ENABLE_SCHEDULE_REMINDER: 'ENABLE_SCHEDULE_REMINDER — 強制スケジュール時報ポップアップを有効化',
-      ENABLE_IMPORTANT_DAY_REMINDER: 'ENABLE_IMPORTANT_DAY_REMINDER — 重要な記念日・特別な日の心温まるリマインドを有効化',
+      ENABLE_SCHEDULE_REMINDER:
+        'ENABLE_SCHEDULE_REMINDER — 強制スケジュール時報ポップアップを有効化',
+      ENABLE_IMPORTANT_DAY_REMINDER:
+        'ENABLE_IMPORTANT_DAY_REMINDER — 重要な記念日・特別な日の心温まるリマインドを有効化',
     },
   },
   workshop: {
@@ -268,7 +321,8 @@ export default {
     retry: '再試行',
     empty: 'トピックはまだありません',
     emptyCategory: 'このカテゴリにはまだ内容がありません',
-    upvoteHint1: '現在 Discussion の人気（upvote）データを取得できないため、👍 リアクション数で並べ替えています。',
+    upvoteHint1:
+      '現在 Discussion の人気（upvote）データを取得できないため、👍 リアクション数で並べ替えています。',
     upvoteHintLink: '詳細設定 → ワークショップ',
     upvoteHint2: 'で GitHub Token を設定すると、正確な upvote 人気データを取得できます。',
     upvoteTitle: 'upvote 人気',
@@ -293,7 +347,8 @@ export default {
     saveConfig: '保存',
     empty: 'プラグインが見つかりません。data/plugins/ にプラグインフォルダを置いてください',
     delete: '削除',
-    deleteConfirm: 'プラグイン「{name}」を削除しますか？プラグインフォルダごと削除され、元に戻せません',
+    deleteConfirm:
+      'プラグイン「{name}」を削除しますか？プラグインフォルダごと削除され、元に戻せません',
   },
   adventurePanel: {
     header: {
@@ -400,7 +455,8 @@ export default {
     delete: {
       button: 'キャラクターを削除',
       confirmTitle: 'キャラクターを削除',
-      confirmMessage: 'キャラクター「{title}」を削除しますか？\nこの操作で、このキャラクターのすべてのセーブデータ・記憶・キャラクターファイルが削除されます。\n\nこの操作は取り消せません。',
+      confirmMessage:
+        'キャラクター「{title}」を削除しますか？\nこの操作で、このキャラクターのすべてのセーブデータ・記憶・キャラクターファイルが削除されます。\n\nこの操作は取り消せません。',
       successTitle: '削除完了',
       successMessage: 'キャラクター「{title}」を削除しました',
       failTitle: '削除失敗',
@@ -408,7 +464,8 @@ export default {
       onstage: 'このキャラクターは場にいるため、退場してから削除してください',
     },
     messages: {
-      realtimeUpdateFailed: '{label} のリアルタイム更新に失敗しました。コンソールログを確認してください',
+      realtimeUpdateFailed:
+        '{label} のリアルタイム更新に失敗しました。コンソールログを確認してください',
       saveFailed: '保存に失敗しました。コンソールログを確認してください',
     },
   },
@@ -571,7 +628,8 @@ export default {
       edit: 'シーンを編集',
       noDescription: '説明なし（選択してもナレーションは発生しません）',
       tip: 'ヒント',
-      noDescriptionTip: 'シーン「{name}」には説明がありません。選択してもシーンナレーションは発生しません',
+      noDescriptionTip:
+        'シーン「{name}」には説明がありません。選択してもシーンナレーションは発生しません',
       deleteConfirm: 'シーン「{name}」を削除しますか？',
       fav: 'お気に入り（先頭へ移動）',
       unfav: 'お気に入りを解除',
@@ -583,10 +641,12 @@ export default {
       categoryCreatedMsg: 'カテゴリ「{name}」を作成しました',
       categoryCreateFail: 'カテゴリの作成に失敗しました',
       categoryDeleted: 'カテゴリを削除しました',
-      categoryDeletedMoved: 'カテゴリ「{name}」を削除し、{count} 件の背景をルートフォルダーに移動しました',
+      categoryDeletedMoved:
+        'カテゴリ「{name}」を削除し、{count} 件の背景をルートフォルダーに移動しました',
       categoryDeleteFail: 'カテゴリの削除に失敗しました',
       categoryDelete: 'カテゴリを削除',
-      categoryDeleteConfirmMove: 'カテゴリ「{name}」を削除し、配下の背景をすべてルートに移動しますか？',
+      categoryDeleteConfirmMove:
+        'カテゴリ「{name}」を削除し、配下の背景をすべてルートに移動しますか？',
       refresh: 'シーンを更新',
       refreshTip: '背景フォルダーを再スキャンし、最新のシーン（サブフォルダー含む）を同期',
       refreshDone: '更新完了',
@@ -725,10 +785,12 @@ export default {
     },
     engineDownload: {
       title: '音声推論エンジンのダウンロード（SBV2）',
-      cpuHint: 'CPU推論にはSBV2-APIを使用します。settings.yml で sbv2 を sbv2api に変更してください。キャラクター設定も変更できます',
+      cpuHint:
+        'CPU推論にはSBV2-APIを使用します。settings.yml で sbv2 を sbv2api に変更してください。キャラクター設定も変更できます',
       cpu: 'CPU推論',
       nvidia: 'NVIDIA推論',
-      amdHint: 'AMD推論にはSBV2-APIを使用します。settings.yml で sbv2 を sbv2api に変更してください。キャラクター設定も変更できます',
+      amdHint:
+        'AMD推論にはSBV2-APIを使用します。settings.yml で sbv2 を sbv2api に変更してください。キャラクター設定も変更できます',
       amd: 'AMD推論',
     },
     back: {
@@ -777,7 +839,8 @@ export default {
       button: 'ドキュメントを見る',
     },
     clearHistory: {
-      confirm: '会話履歴を削除すると、現在のすべての会話記録が失われます。先にセーブすることをお勧めします。\n\nセーブはお済みですか？削除してもよろしいですか？',
+      confirm:
+        '会話履歴を削除すると、現在のすべての会話記録が失われます。先にセーブすることをお勧めします。\n\nセーブはお済みですか？削除してもよろしいですか？',
       successTitle: '削除成功',
       successMessage: '会話履歴を削除しました',
       errorTitle: '削除失敗',
@@ -815,7 +878,8 @@ export default {
       usingSystemDefault: '現在システムデフォルトの出力デバイスを使用中',
       currentOutput: '現在の出力：{label}',
       unavailableFallback: '出力デバイスが利用できません（システムデフォルトに戻しました）',
-      labelsDenied: '権限がありません。デバイス名を表示できません。システム設定で許可してから再試行してください',
+      labelsDenied:
+        '権限がありません。デバイス名を表示できません。システム設定で許可してから再試行してください',
       unsupported: 'この環境では音声出力デバイスの切り替えをサポートしていません',
     },
     bgm: {
@@ -839,7 +903,8 @@ export default {
       categoryNamePlaceholder: '新カテゴリ名',
       categoryAdd: 'カテゴリを追加',
       categoryDelete: 'カテゴリを削除',
-      categoryDeleteConfirmMove: 'カテゴリ「{name}」を削除し、配下の音楽をすべてルートに移動しますか？',
+      categoryDeleteConfirmMove:
+        'カテゴリ「{name}」を削除し、配下の音楽をすべてルートに移動しますか？',
       refresh: '音楽を更新',
       openFolder: 'フォルダーを開く',
       fav: 'お気に入り（先頭へ移動）',
@@ -977,7 +1042,8 @@ export default {
       label: 'DeBERTa とトークナイザー',
       installed: 'インストール済み',
       missing: '未導入',
-      warning: 'DeBERTa モデルまたはトークナイザーがありません。キャラクター音声を読み込めず、試聴もできません。',
+      warning:
+        'DeBERTa モデルまたはトークナイザーがありません。キャラクター音声を読み込めず、試聴もできません。',
       delete: 'DeBERTa を削除',
     },
     voices: {
@@ -1035,17 +1101,22 @@ export default {
       deleteConfirmTitle: 'ローカル音声を削除',
       deleteSuccess: '音声を削除しました',
       deleteFailed: '削除に失敗：{error}',
-      deleteDebertaConfirm: 'DeBERTa モデルとトークナイザーを削除しますか？削除後は再ダウンロードできます。',
+      deleteDebertaConfirm:
+        'DeBERTa モデルとトークナイザーを削除しますか？削除後は再ダウンロードできます。',
       deleteDebertaConfirmTitle: 'DeBERTa を削除',
       deleteDebertaSuccess: 'DeBERTa を削除しました',
       deleteDebertaFailed: 'DeBERTa の削除に失敗：{error}',
       enableHintTitle: 'ローカル TTS を有効にしました',
-      enableHintMessage: 'ローカル TTS を有効にしたら、キャラクター音声設定で TTS タイプを「ローカル SBV2 API」とローカル音声IDに選択してください',
+      enableHintMessage:
+        'ローカル TTS を有効にしたら、キャラクター音声設定で TTS タイプを「ローカル SBV2 API」とローカル音声IDに選択してください',
       previewFailed: '試聴に失敗：{error}',
       readSwitchFailed: 'ローカル TTS スイッチの読み取りに失敗：{error}',
       switchEnabled: 'ローカル TTS を有効にしました。',
-      switchEnabledNotReady: 'ローカル TTS を有効にしましたが、エンジンが未準備です（DeBERTa モデルまたはトークナイザーがありません。先にダウンロードしてください）。',
-      switchDisabled: 'ローカル TTS を無効にしました。クラウド TTS を使用するには、キャラクター音声を「クラウド」に切り替えてアプリを再起動してください。',
+      switchEnabledNotReady:
+        'ローカル TTS を有効にしましたが、エンジンが未準備です（DeBERTa モデルまたはトークナイザーがありません。先にダウンロードしてください）。',
+      switchDisabled:
+        'ローカル TTS を無効にしました。クラウド TTS を使用するには、キャラクター音声を「クラウド」に切り替えてアプリを再起動してください。',
       saveSwitchFailed: 'ローカル TTS スイッチの保存に失敗：{error}',
     },
-  },}
+  },
+}

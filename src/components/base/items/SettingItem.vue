@@ -48,11 +48,11 @@
       <input
         type="text"
         :id="setting.key"
-        v-model="setting.value"
+        v-model="localValue"
         class="flex-1 px-3 py-2.5 border rounded-lg text-sm text-white bg-white/10 backdrop-blur-xl backdrop-saturate-150 border-white/10 shadow-glass focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all duration-200"
       />
       <button
-        @click="selectFile(setting)"
+        @click="selectFile"
         type="button"
         class="px-4 py-2.5 bg-brand text-white rounded-lg hover:bg-[#0056b3] transition-colors duration-200 whitespace-nowrap"
       >
@@ -125,11 +125,13 @@ const handleCheckboxChange = (checked: boolean) => {
   emit('update:value', newValue)
 }
 
-const selectFile = async (setting: { key: string; value: string }) => {
+const selectFile = async () => {
   try {
     const path = await invoke<string | null>('select_file')
     if (path) {
-      setting.value = path
+      // 通过 localValue 触发 watch → emit 'update:value' 回传父组件，
+      // 让父组件写回原始配置对象（而不是改 localizedSetting 复制出的新对象）
+      localValue.value = path
     }
   } catch (error: any) {
     console.error('文件选择失败:', error)
