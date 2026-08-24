@@ -23,6 +23,7 @@ import { invoke } from '@tauri-apps/api/core'
 
 import { getAutostartStatus } from './api/services/config'
 import { useGameStore } from './stores/modules/game'
+import { eventQueue } from './core/events/event-queue'
 import CursorEffects from './components/effects/CursorEffects.vue'
 import Notification from './components/ui/Notification.vue'
 import AchievementToast from './components/ui/AchievementToast.vue'
@@ -157,24 +158,45 @@ onMounted(async () => {
         // 进入桌宠前标记「准备中」：在前端 LLM、TTS 服务与入场问候就绪前禁止对话
         uiStore.petReady = false
         uiStore.petBooting = true
-        // 若开启入场问候，先在触发之前注册「问候完成」监听，避免错过事件
-        const waitGreeting = auto.startup_greeting ? waitEntryGreetingDone() : Promise.resolve()
-        await gameStore.bootAsPet(petRoleId > 0 ? petRoleId : undefined, auto.startup_greeting)
-        const roleId =
-          gameStore.mainRoleId > 0 ? gameStore.mainRoleId : petRoleId > 0 ? petRoleId : null
-        if (auto.auto_play) uiStore.autoMode = true
-        router.push('/pet')
-        // 等「前端 LLM 配置」「外部 TTS 服务」「入场问候完成」都就绪
-        // （内置 TTS / 未配启动脚本 / 未开启问候时立即就绪）；并保证 loading 至少展示一小段。
-        Promise.all([
-          llmStore.load().catch(() => {}),
-          invoke('autostart_boot_apply', { roleId }).catch(() => {}),
-          waitGreeting,
-          new Promise((resolve) => setTimeout(resolve, 2000)),
-        ]).finally(() => {
+        try {
+          // 1) 只加载默认角色（不触发问候，避免语音生成时 API 未就绪）
+          await gameStore.bootAsPet(petRoleId > 0 ? petRoleId : undefined)
+          const roleId =
+            gameStore.mainRoleId > 0 ? gameStore.mainRoleId : petRoleId > 0 ? petRoleId : null
+          if (auto.auto_play) uiStore.autoMode = true
+          router.push('/pet')
+
+          // 2) 先让前端 LLM 与外部 TTS 服务就绪（拉起 bat + 探测 + 刷新 TTS）
+          //    仅在开启「自动开启 API 服务」时拉起；内置/未配置/未开启时立即就绪
+          const ttsReady = auto.auto_start_tts
+            ? invoke('autostart_boot_apply', { roleId }).catch(() => {})
+            : Promise.resolve()
+          await Promise.all([llmStore.load().catch(() => {}), ttsReady])
+
+          // 3) API 就绪、TTS 刷新完成后，再触发「入场问候」，保证语音合成时服务已可用
+          if (auto.startup_greeting) {
+            const wait = waitEntryGreetingDone()
+            invoke('notify_player_entry').catch((err) =>
+              console.warn('[Entry] 问候触发失败（非致命）:', err),
+            )
+            await wait
+          }
+
+          // 4) 保证 loading 至少展示一段时间（给刷新/落盘留缓冲）
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+        } catch (e) {
+          console.error('[Autostart] 启动即桌宠初始化失败:', e)
+        } finally {
+          // 5) loading 结束、角色显示后再恢复事件队列消费，让问候/对话按顺序处理与播放
+          eventQueue.resume()
           uiStore.petReady = true
           uiStore.petBooting = false
-        })
+        }
+      } else if (auto.auto_start_tts) {
+        // 正常启动（非桌宠）：也按全局开关自动拉起/刷新外部 TTS API 服务
+        invoke('autostart_boot_apply', { roleId: null }).catch((e) =>
+          console.warn('[Autostart] 正常启动拉起 TTS 失败（非致命）:', e),
+        )
       }
     } catch (e) {
       console.error('[Autostart] 启动即桌宠初始化失败:', e)

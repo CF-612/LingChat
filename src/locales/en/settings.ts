@@ -306,11 +306,12 @@ export default {
         pet_role_id:
           'Default role ID loaded at auto-startup (leave empty to keep the last role you played)',
         tts_launcher_bat:
-          'Path to the startup script (.bat) for external TTS modes, used to launch your self-hosted voice service at boot; can be left empty for the built-in local TTS engine',
+          'Path to the startup script (.bat) for external TTS modes, used to launch your self-hosted voice service at startup; can be left empty for the built-in local TTS engine',
       },
       startup: {
         pet_mode: 'Start as pet: when on, launching the exe manually opens directly in pet mode (independent of the pet switch under "Auto Start as Pet"; Windows only)',
         auto_play: 'Auto-play dialogue: when on, the dialogue auto-play switch is on by default in chat scenes (applies globally)',
+        auto_start_tts: 'Auto-start API service: when on, LingChat launches and refreshes the external TTS service on startup whether in pet mode or normal mode (needs the startup script below)',
         greeting: 'Entry greeting: when on, the character proactively greets you',
       },
       ENABLE_PROACTIVE_SYSTEM:

@@ -277,11 +277,12 @@ export default {
         boot_as_pet: '以桌宠模式启动：开启后，开机自启动时以桌宠模式进入（仅 Windows 可用）',
         pet_role_id: '开机自启动默认加载的角色 ID（留空则沿用上次游玩的角色）',
         tts_launcher_bat:
-          '外部 TTS 模式的启动脚本（.bat）路径，用于开机时拉起自托管语音服务；内置本地 TTS 引擎可留空',
+          '外部 TTS 模式的启动脚本（.bat）路径，用于启动时拉起自托管语音服务；内置本地 TTS 引擎可留空',
       },
       startup: {
         pet_mode: '以桌宠模式启动：开启后，手动点击 exe 启动时直接进入桌宠模式（与「开机自启动」里的桌宠开关相互独立，仅 Windows 可用）',
         auto_play: '默认自动播放对话：开启后，在对话场景会默认开启自动播放对话开关（全局生效）',
+        auto_start_tts: '启动时自动开启 API 服务：开启后，无论以桌宠还是正常启动，都会自动拉起并刷新外部 TTS 服务（需配置下方启动脚本）',
         greeting: '入场问候：开启后，角色会主动先发出问候',
       },
       ENABLE_PROACTIVE_SYSTEM: 'ENABLE_PROACTIVE_SYSTEM — 是否启用主动对话系统',

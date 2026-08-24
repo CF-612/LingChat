@@ -40,6 +40,8 @@ pub struct AutostartStatus {
     pub startup_pet_mode: bool,
     /// 进入桌宠时是否发出「入场问候」（角色主动问候；默认关闭）。
     pub startup_greeting: bool,
+    /// 启动时是否自动拉起/刷新外部 TTS API 服务（全局：无论桌宠还是正常启动均生效）。
+    pub auto_start_tts: bool,
 }
 
 /// `autostart_boot_apply` 的返回结果。
@@ -93,6 +95,7 @@ fn read_config(app: &AppHandle) -> AutostartStatus {
     let auto_play = read_bool(app, keys::STARTUP_AUTO_PLAY);
     let startup_pet_mode = read_bool(app, keys::STARTUP_PET_MODE);
     let startup_greeting = read_bool(app, keys::STARTUP_GREETING);
+    let auto_start_tts = read_bool(app, keys::STARTUP_AUTO_START_TTS);
 
     let system_enabled = system_autostart_enabled(app);
     let launched_by_autostart = std::env::args().any(|a| a == "--autostart");
@@ -106,6 +109,7 @@ fn read_config(app: &AppHandle) -> AutostartStatus {
         auto_play,
         startup_pet_mode,
         startup_greeting,
+        auto_start_tts,
     }
 }
 
@@ -250,10 +254,21 @@ pub async fn autostart_boot_apply(app: AppHandle, role_id: Option<i32>) -> Resul
 
 /// 从数据库读取角色当前使用的 TTS 类型。
 async fn resolve_role_tts_type(app: &AppHandle, role_id: Option<i32>) -> Option<String> {
-    let role_id = role_id?;
-    if role_id <= 0 {
-        return None;
-    }
+    // 未传 roleId（如正常启动、尚未进入桌宠）时，用后端已加载的当前角色，
+    // 这样也能判断是否需要拉起外部 TTS API 服务。
+    let role_id = match role_id {
+        Some(id) if id > 0 => id,
+        _ => {
+            let state = app.state::<AppState>();
+            // 先把 game_status 的 Arc 单独取出来，避免临时锁 guard 被提前释放导致借用错误
+            let gs = {
+                let svc = state.ai_service.lock().await;
+                svc.game_status.clone()
+            };
+            let current = { let gs = gs.lock().await; gs.current_role_id };
+            current?
+        }
+    };
     let state = app.state::<AppState>();
     let db = &state.db;
     let data_dir = crate::api::data_dir();

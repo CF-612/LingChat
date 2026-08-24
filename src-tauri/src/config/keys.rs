@@ -149,3 +149,5 @@ pub const STARTUP_PET_MODE: &str = "startup.pet_mode";
 pub const STARTUP_AUTO_PLAY: &str = "startup.auto_play";
 /// 进入桌宠时是否发出「入场问候」（角色主动问候；默认关闭，便于排查“角色不理会玩家消息”）。
 pub const STARTUP_GREETING: &str = "startup.greeting";
+/// 启动时自动拉起/刷新外部 TTS API 服务（全局设置：无论桌宠还是正常启动均生效）。
+pub const STARTUP_AUTO_START_TTS: &str = "startup.auto_start_tts";

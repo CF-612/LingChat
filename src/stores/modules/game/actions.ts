@@ -7,7 +7,6 @@ import { useUIStore } from '../ui/ui'
 import { useSettingsStore } from '../settings'
 import type { SceneInfo } from '@/api/services/scene'
 import { invoke } from '@tauri-apps/api/core'
-import { eventQueue } from '@/core/events/event-queue'
 
 export const actions = {
   appendGameMessage(this: GameState, message: GameMessage) {
@@ -37,14 +36,12 @@ export const actions = {
   },
 
   /**
-   * 启动即桌宠：加载默认角色（或沿用上次角色），恢复事件队列消费，
-   * 并在开启「入场问候」时触发问候。
-   * 说明：问候触发时机偏早（可能在外部 TTS API 就绪前），可能造成部分语音在 API 就绪前
-   * 合成失败；但这是「UI 可稳定显示」的基线版本，语音时序优化另行跟进（避免再次闪退）。
+   * 启动即桌宠：只加载默认角色（或沿用上次角色）。
+   * 事件队列恢复与入场问候都不在此触发，而是由 App.vue 在正确的顺序里完成：
+   * 「加载角色 → API 就绪 + 刷新 TTS → 再触发入场问候（生成语音）→ loading 结束 → 播放」。
    * @param roleId 开机自启动默认角色 ID；>0 时切换并加载，否则沿用上次游玩的角色。
-   * @param greeting 是否发出「入场问候」（默认 false）。
    */
-  async bootAsPet(this: GameState, roleId?: number, greeting = false) {
+  async bootAsPet(this: GameState, roleId?: number) {
     let gameInfo: WebInitData
     if (roleId && roleId > 0) {
       gameInfo = await selectCharacter(roleId)
@@ -52,14 +49,6 @@ export const actions = {
       gameInfo = await getGameInfo()
     }
     applyWebInitData(this, gameInfo)
-    // 恢复事件队列消费（桌宠直接进入时没有 MainChat 的 LoadingTransition）
-    eventQueue.resume()
-    // 入场问候默认关闭；开启时才触发
-    if (greeting) {
-      invoke('notify_player_entry').catch((err) =>
-        console.warn('[Entry] 问候触发失败（非致命）:', err),
-      )
-    }
     return gameInfo
   },
 

@@ -45,6 +45,8 @@ export interface AutostartStatus {
   startup_pet_mode: boolean
   /** 进入桌宠时是否发出「入场问候」（默认关闭） */
   startup_greeting: boolean
+  /** 启动时是否自动拉起/刷新外部 TTS API 服务（全局：无论桌宠还是正常启动均生效） */
+  auto_start_tts: boolean
 }
 
 export interface AutostartBootResult {
