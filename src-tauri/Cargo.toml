@@ -76,10 +76,10 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # 插件系统：嵌入 RustPython 跑插件 Python 脚本（目前是一个受限沙箱）。
 # 桌面与移动端（Android/iOS）都编译，供安卓自测。
-rustpython-vm = { version = "0.5", default-features = false, features = ["compiler", "gc", "host_env", "stdio", "serde", "freeze-stdlib"] }
+rustpython-vm = { version = "0.5", default-features = false, features = ["compiler", "gc", "stdio", "serde", "freeze-stdlib"] }
 rustpython-pylib = { version = "0.5", features = ["freeze-stdlib"] }
 rustpython-derive = "0.5"
-#libffi = { version = "*", default-features = false, features = ["std"] }
+
 
 # LAN Sync
 axum = { version = "0.7", features = ["tokio"] }
@@ -98,7 +98,7 @@ tauri-plugin-autostart = "2"
 [target.'cfg(target_os = "windows")'.dependencies]
 ort = { version = "=2.0.0-rc.13", default-features = false, features = ["directml"] }
 sbv2_core = { git = "https://gh-proxy.org/github.com/shadow01a/sbv2-api/", default-features = false, features = ["directml"] }
-windows = { version = "0.62.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi"] }
+windows = { version = "0.62.2", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Dxgi", "Win32_Security", "Win32_System_Threading"] }
 
 [target.'cfg(any(target_os = "linux", all(target_os = "macos", target_arch = "x86_64")))'.dependencies]
 # GPU 性能分级：Linux 走 Vulkan、macOS(x86_64) 走 Metal（WebGPU / wgpu）
