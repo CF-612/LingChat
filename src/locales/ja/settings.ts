@@ -653,6 +653,13 @@ export default {
       refreshDone: '更新完了',
       refreshDoneMsg: 'シーンを同期しました',
       refreshFail: '更新に失敗しました',
+      moveToTitle: 'サブカテゴリへ移動',
+      moveToRoot: 'ルート',
+      moveNoCategory: 'サブカテゴリがありません。上の分類バーで作成してください',
+      moveNoBackground: 'このシーンには背景画像がなく、移動できません',
+      movedTitle: '移動完了',
+      movedMsg: 'シーン「{name}」を「{category}」に移動しました',
+      moveFail: '移動に失敗しました',
     },
     sort: {
       title: 'シーンの並び替え',

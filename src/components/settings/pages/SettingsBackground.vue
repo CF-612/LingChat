@@ -113,6 +113,7 @@
               : '',
           ]"
           @click="handleSceneClick(scene)"
+          @contextmenu.prevent="openSceneContextMenu(scene, $event)"
         >
           <!-- 编辑按钮（右上角扳手） -->
           <button
@@ -166,6 +167,41 @@
               $t('settings.background.scene.noDescription')
             }}</span>
           </div>
+        </div>
+      </div>
+
+      <!-- 场景右键菜单：移动到子分类 -->
+      <div
+        v-if="sceneMenu.visible"
+        class="fixed inset-0 z-[9998]"
+        @click="closeSceneContextMenu"
+        @contextmenu.prevent="closeSceneContextMenu"
+      ></div>
+      <div
+        v-if="sceneMenu.visible && sceneMenu.scene"
+        class="fixed z-[9999] min-w-44 rounded-xl border border-white/15 bg-slate-900/95 backdrop-blur-xl p-1.5 shadow-2xl"
+        :style="sceneMenuStyle"
+        @click.stop
+      >
+        <div class="px-2.5 py-1.5 text-xs font-semibold text-white/40">
+          {{ $t('settings.background.scene.moveToTitle') }}
+        </div>
+        <button
+          class="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-white/80 hover:bg-white/10 transition-colors"
+          @click="handleMoveScene(sceneMenu.scene, '根目录')"
+        >
+          {{ $t('settings.background.scene.moveToRoot') }}
+        </button>
+        <button
+          v-for="cat in backgroundCategories"
+          :key="'move-' + cat"
+          class="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-white/80 hover:bg-white/10 transition-colors"
+          @click="handleMoveScene(sceneMenu.scene, cat)"
+        >
+          {{ cat }}
+        </button>
+        <div v-if="backgroundCategories.length === 0" class="px-2.5 py-1.5 text-xs text-white/30">
+          {{ $t('settings.background.scene.moveNoCategory') }}
         </div>
       </div>
 
@@ -563,6 +599,7 @@ import {
   deleteScene,
   selectScene,
   clearEmptyScenes,
+  moveSceneToCategory,
   type SceneInfo,
   type LightingParams,
 } from '../../../api/services/scene'
@@ -754,11 +791,19 @@ const backgroundCategories = ref<string[]>([])
 const currentBackgroundCategory = ref<string>('全部')
 const newCategoryName = ref('')
 
-// 场景的背景 → 所属分类 映射（url → category），用于按分类过滤场景卡片
+// 场景的背景 → 所属分类 映射（url → category），用于按分类过滤场景卡片。
+// 先按完整 url 精确匹配；再按文件名（basename）兜底匹配，兼顾
+// 前后端对路径分隔符/大小写的表示差异，避免子分类标签下场景被误归为“根目录”。
 function categoryOfBackground(url: string): string {
   if (!url) return '根目录'
   const matched = backgroundList.value.find((b) => b.url === url)
-  return matched?.category || '根目录'
+  if (matched?.category) return matched.category
+  const base = (url.split(/[\\/]/).pop() || '').toLowerCase()
+  const byName = backgroundList.value.find((b) => {
+    const bBase = (b.url || '').split(/[\\/]/).pop() || ''
+    return bBase.toLowerCase() === base
+  })
+  return byName?.category || '根目录'
 }
 
 // 收藏置顶排序后的完整场景列表（再按背景分类过滤）
@@ -988,6 +1033,8 @@ async function fetchBackgrounds(): Promise<BackgroundImageInfo[]> {
       title: background.title || 'Untitled',
       url: background.url || '',
       time: background.time,
+      // 保留所属子分类（子文件夹名），否则按分类选项卡过滤场景时会全部落到“根目录”
+      category: background.category,
     }))
   } catch (error) {
     console.error('Failed to fetch background list:', error)
@@ -1194,6 +1241,53 @@ async function handleRefreshScenes(): Promise<void> {
     console.error('刷新场景失败:', e)
     uiStore.showError({
       title: t('settings.background.scene.refreshFail'),
+      message: e?.message || '',
+    })
+  }
+}
+
+// ── 场景右键菜单：移动到子分类 ──
+const sceneMenu = ref<{ visible: boolean; x: number; y: number; scene: SceneInfo | null }>({
+  visible: false,
+  x: 0,
+  y: 0,
+  scene: null,
+})
+
+// 菜单定位：尽量不超出视口右/下边界
+const sceneMenuStyle = computed(() => ({
+  left: Math.max(0, Math.min(sceneMenu.value.x, window.innerWidth - 190)) + 'px',
+  top: Math.max(0, Math.min(sceneMenu.value.y, window.innerHeight - 260)) + 'px',
+}))
+
+function openSceneContextMenu(scene: SceneInfo, event: MouseEvent): void {
+  sceneMenu.value = { visible: true, x: event.clientX, y: event.clientY, scene }
+}
+
+function closeSceneContextMenu(): void {
+  sceneMenu.value.visible = false
+}
+
+// 把场景的背景图片移动到目标子分类（子文件夹）
+async function handleMoveScene(scene: SceneInfo, category: string): Promise<void> {
+  closeSceneContextMenu()
+  if (!scene.background) {
+    await dialogStore.alert(t('settings.background.scene.moveNoBackground'))
+    return
+  }
+  try {
+    await moveSceneToCategory(scene.id, category)
+    await refreshBackground()
+    await fetchScenes()
+    uiStore.showSuccess({
+      title: t('settings.background.scene.movedTitle'),
+      message: t('settings.background.scene.movedMsg', { name: scene.scene_name, category }),
+      duration: 3000,
+    })
+  } catch (e: any) {
+    console.error('移动场景到分类失败:', e)
+    uiStore.showError({
+      title: t('settings.background.scene.moveFail'),
       message: e?.message || '',
     })
   }

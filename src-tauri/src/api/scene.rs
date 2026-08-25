@@ -18,6 +18,8 @@ pub struct SceneInfo {
     pub scene_name: String,
     pub scene_description: String,
     pub background: Option<String>,
+    /// 场景所属子分类（背景子文件夹名；根目录为“根目录”）
+    pub category: String,
     pub lighting: Option<LightingParams>,
     pub created_at: String,
     pub updated_at: String,
@@ -82,10 +84,59 @@ fn model_to_info(s: &Scene) -> SceneInfo {
         scene_name: s.name.clone(),
         scene_description: s.description.clone(),
         background: if bg.is_empty() { None } else { Some(bg) },
+        category: s.category.clone(),
         lighting: s.lighting.clone(),
         created_at: s.created_at.clone(),
         updated_at: s.updated_at.clone(),
     }
+}
+
+/// 根据背景（文件名或路径）推断其所属子分类：解析出完整路径后取其父目录名；
+/// 位于 backgrounds 根目录或解析失败时为「根目录」。
+fn category_from_background(raw: &str) -> String {
+    if raw.is_empty() {
+        return "根目录".to_string();
+    }
+    let file_name = to_background_filename(raw);
+    if let Some(full) =
+        crate::api::background::find_background_file_recursive(&data_dir(), &file_name)
+    {
+        let p = std::path::Path::new(&full);
+        let bg_base = super::backgrounds_dir();
+        if let Some(parent) = p.parent() {
+            if parent != &bg_base {
+                if let Some(cat) = parent.file_name().and_then(|n| n.to_str()) {
+                    return cat.to_string();
+                }
+            }
+        }
+    }
+    "根目录".to_string()
+}
+
+/// 旧数据迁移：若场景的 background 实际位于子文件夹（且未显式设置分类），
+/// 按其所在子文件夹名补全 category（一次性；保存由调用方负责，仅当有变化时返回 true）。
+fn migrate_scene_category(scene: &mut Scene, bg_base: &std::path::Path) -> bool {
+    if scene.category != "根目录" {
+        return false;
+    }
+    if scene.background.trim().is_empty() {
+        return false;
+    }
+    if let Some(full) =
+        crate::api::background::find_background_file_recursive(&data_dir(), &scene.background)
+    {
+        let p = std::path::Path::new(&full);
+        if let Some(parent) = p.parent() {
+            if parent != bg_base {
+                if let Some(cat) = parent.file_name().and_then(|n| n.to_str()) {
+                    scene.category = cat.to_string();
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 fn now_iso() -> String {
@@ -104,6 +155,20 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
     // 自动将背景目录（含子文件夹）中未被注册为场景的图片注册为场景。
     // 去重依据：场景存的是纯文件名，这里收集所有场景背景的文件名做比对。
     let bg_dir = super::backgrounds_dir();
+
+    // 旧数据迁移：早期场景未存 category，若其背景实际位于子文件夹，则补全分类
+    let mut dirty = false;
+    for s in scenes.iter_mut() {
+        if migrate_scene_category(s, &bg_dir) {
+            dirty = true;
+        }
+    }
+    if dirty {
+        store
+            .save_all(&scenes)
+            .map_err(|e| format!("迁移场景分类失败: {}", e))?;
+    }
+
     let existing_bgs: HashSet<String> = scenes
         .iter()
         .map(|s| to_background_filename(&s.background))
@@ -133,11 +198,25 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
             if existing_bgs.contains(&file_name) {
                 continue;
             }
-            // 自动注册：名称为文件名（不含后缀），仅存文件名
+            // 自动注册：名称为文件名（不含后缀），仅存文件名；category 取自其所在子文件夹
             let name = path
                 .file_stem()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
+            let category = {
+                if let Some(parent) = path.parent() {
+                    if parent != &bg_dir {
+                        parent
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "根目录".to_string())
+                    } else {
+                        "根目录".to_string()
+                    }
+                } else {
+                    "根目录".to_string()
+                }
+            };
             let now = now_iso();
             scenes.push(Scene {
                 id: Uuid::new_v4().to_string(),
@@ -145,6 +224,7 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
                 description: String::new(),
                 background: file_name.clone(),
                 lighting: None,
+                category,
                 created_at: now.clone(),
                 updated_at: now,
             });
@@ -174,6 +254,7 @@ pub async fn create_scene(_app: AppHandle, req: CreateSceneRequest) -> Result<Sc
         name: req.scene_name,
         description: req.scene_description,
         background: to_background_filename(&req.background),
+        category: category_from_background(&req.background),
         lighting: req.lighting,
         created_at: now.clone(),
         updated_at: now,
@@ -201,6 +282,7 @@ pub async fn update_scene(_app: AppHandle, req: UpdateSceneRequest) -> Result<Sc
     scenes[idx].name = req.scene_name;
     scenes[idx].description = req.scene_description;
     scenes[idx].background = to_background_filename(&req.background);
+    scenes[idx].category = category_from_background(&req.background);
     scenes[idx].lighting = req.lighting;
     scenes[idx].updated_at = now_iso();
 
@@ -274,6 +356,65 @@ pub async fn clear_empty_scenes(app: AppHandle) -> Result<usize, String> {
     }
 
     Ok(removed)
+}
+
+/// 把某个场景的背景文件移动到目标子分类（子文件夹）。
+/// category 传「根目录」则移动到 backgrounds 根目录；否则移动到 backgrounds/<category>/ 下。
+/// 同时更新场景的 category 字段（scene.background 存纯文件名，移动后仍可解析）。
+#[tauri::command]
+pub async fn move_scene_to_category(
+    _app: AppHandle,
+    id: String,
+    category: String,
+) -> Result<SceneInfo, String> {
+    let store = SceneStore::new(&data_dir());
+    let mut scenes = store
+        .load_all()
+        .map_err(|e| format!("加载场景列表失败: {}", e))?;
+
+    let idx = scenes
+        .iter()
+        .position(|s| s.id == id)
+        .ok_or_else(|| format!("场景 {} 不存在", id))?;
+
+    let target = {
+        let t = category.trim();
+        if t.is_empty() {
+            "根目录".to_string()
+        } else {
+            t.to_string()
+        }
+    };
+
+    let file_name = to_background_filename(&scenes[idx].background);
+    if file_name.trim().is_empty() {
+        return Err("该场景没有关联的背景，无法移动".to_string());
+    }
+
+    let bg_base = super::backgrounds_dir();
+    let full = crate::api::background::find_background_file_recursive(&data_dir(), &file_name)
+        .ok_or_else(|| format!("找不到背景文件: {file_name}"))?;
+
+    let src = std::path::PathBuf::from(&full);
+    let dest_dir = if target == "根目录" {
+        bg_base.clone()
+    } else {
+        bg_base.join(&target)
+    };
+    std::fs::create_dir_all(&dest_dir).map_err(|e| format!("创建分类目录失败: {e}"))?;
+    let dest = dest_dir.join(&file_name);
+
+    if src != dest {
+        std::fs::rename(&src, &dest).map_err(|e| format!("移动背景文件失败: {e}"))?;
+    }
+
+    scenes[idx].category = target.clone();
+    scenes[idx].updated_at = now_iso();
+    let info = model_to_info(&scenes[idx]);
+    store
+        .save_all(&scenes)
+        .map_err(|e| format!("保存场景失败: {}", e))?;
+    Ok(info)
 }
 
 #[tauri::command]

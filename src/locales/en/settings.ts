@@ -670,6 +670,13 @@ export default {
       refreshDone: 'Refreshed',
       refreshDoneMsg: 'Scenes synced',
       refreshFail: 'Refresh failed',
+      moveToTitle: 'Move to subcategory',
+      moveToRoot: 'Root',
+      moveNoCategory: 'No subcategory yet, create one in the category bar above',
+      moveNoBackground: 'This scene has no background image and cannot be moved',
+      movedTitle: 'Moved',
+      movedMsg: 'Scene "{name}" moved to "{category}"',
+      moveFail: 'Move failed',
     },
     sort: {
       title: 'Scene Sort',

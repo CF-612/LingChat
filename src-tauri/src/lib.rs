@@ -667,6 +667,7 @@ pub fn run() {
             api::scene::update_scene,
             api::scene::delete_scene,
             api::scene::clear_empty_scenes,
+            api::scene::move_scene_to_category,
             api::scene::select_scene,
             api::scene::set_scene_awareness,
             api::music::get_music_list,

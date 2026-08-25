@@ -592,7 +592,14 @@ export default {
       "refreshTip": "重新掃描背景資料夾，同步最新場景（包括子資料夾）",
       "refreshDone": "刷新完成",
       "refreshDoneMsg": "場景已同步",
-      "refreshFail": "刷新失敗"
+      "refreshFail": "刷新失敗",
+      "moveToTitle": "移動到子分類",
+      "moveToRoot": "根目錄",
+      "moveNoCategory": "暫無子分類，請先在分類欄新建",
+      "moveNoBackground": "該場景沒有背景圖片，無法移動",
+      "movedTitle": "移動成功",
+      "movedMsg": "場景「{name}」已移動到「{category}」",
+      "moveFail": "移動失敗"
     },
     "sort": {
       "title": "場景排序",

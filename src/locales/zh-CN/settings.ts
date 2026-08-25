@@ -633,6 +633,13 @@ export default {
       refreshDone: '刷新完成',
       refreshDoneMsg: '场景已同步',
       refreshFail: '刷新失败',
+      moveToTitle: '移动到子分类',
+      moveToRoot: '根目录',
+      moveNoCategory: '暂无子分类，请先在分类栏新建',
+      moveNoBackground: '该场景没有背景图片，无法移动',
+      movedTitle: '移动成功',
+      movedMsg: '场景「{name}」已移动到「{category}」',
+      moveFail: '移动失败',
     },
     sort: {
       title: '场景排序',

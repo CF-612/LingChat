@@ -583,6 +583,7 @@ pub(crate) async fn build_web_init_data(
                     }
                 },
                 lighting: s.lighting.clone(),
+                category: s.category.clone(),
                 created_at: s.created_at,
                 updated_at: s.updated_at,
             })
