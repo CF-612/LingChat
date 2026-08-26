@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use chrono::Local;
 use sea_orm::DatabaseConnection;
-use tauri::{Listener, Manager};
+use tauri::{Emitter, Listener, Manager};
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -407,6 +407,7 @@ pub fn run() {
             let tool_registry = Arc::new(ai_service::tools::built_in_registry(
                 role_names,
                 tool_settings.clone(),
+                app.handle().clone(),
             )?);
 
             // 插件系统：确保 data/plugins 目录存在并扫描加载插件（工具注册进 registry）。
@@ -586,6 +587,15 @@ pub fn run() {
                                 let logical_x = mouse_x / scale_factor;
                                 let logical_y = mouse_y / scale_factor;
 
+                                // 向桌宠前端广播全局鼠标位置：桌宠窗口非全屏，DOM
+                                // pointermove 在鼠标移出窗口后停发，Live2D 视线会冻结在
+                                // 最后一次窗口内位置。这里把窗口内逻辑坐标（即 webview
+                                // 视口坐标）发给前端驱动视线，与 DOM clientX/Y 同坐标系。
+                                let _ = window.emit(
+                                    "pet:cursor",
+                                    api::pet::CursorPosition { x: logical_x, y: logical_y },
+                                );
+
                                 let mut is_over_solid = false;
                                 if let Ok(rects) = rects_arc.lock() {
                                     for r in rects.iter() {
@@ -642,6 +652,11 @@ pub fn run() {
             api::settings::switch_llm,
             api::settings::test_llm_provider,
             api::settings::list_llm_models,
+            api::codex::codex_auth_status,
+            api::codex::codex_start_login,
+            api::codex::codex_poll_login,
+            api::codex::codex_logout,
+            api::codex::codex_get_quota,
             api::font::list_system_fonts,
             api::font::import_font,
             api::font::list_imported_fonts,
@@ -655,6 +670,9 @@ pub fn run() {
             api::character::update_role_settings,
             api::character::delete_character,
             api::character::open_characters_folder,
+            api::live2d::import_live2d,
+            api::live2d::get_live2d_file,
+            api::live2d::inspect_live2d,
             api::background::get_background_list,
             api::background::get_background_file,
             api::background::upload_background_image,
