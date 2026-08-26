@@ -124,9 +124,12 @@ interface CharacterCardData {
 }
 
 const characters = ref<CharacterCardData[]>([])
+const allCharacters = ref<CharacterCardData[]>([])
 const currentPage = ref(1)
 const totalPages = ref(1)
 const CHARACTER_FAVORED_KEY = 'lingchat.character.favored.v1'
+const PAGE_SIZE = 6 // 本地分页每页数量（与原后端默认一致）
+const FETCH_ALL_PAGE_SIZE = 1000 // 一次性取全量角色，以便收藏跨页排序
 function loadCharFavored(): number[] {
   try {
     const raw = localStorage.getItem(CHARACTER_FAVORED_KEY)
@@ -138,15 +141,27 @@ function loadCharFavored(): number[] {
 function isCharFavored(id: number): boolean {
   return loadCharFavored().includes(id)
 }
-// 收藏的角色排在前（按收藏先后），当前页内排序
+// 把已按收藏排序的全量角色按页切片到当前页
+function paginate(page: number): void {
+  const total = allCharacters.value.length
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  totalPages.value = pages
+  if (page > pages) page = pages
+  if (page < 1) page = 1
+  currentPage.value = page
+  const startValue = (currentPage.value - 1) * PAGE_SIZE
+  characters.value = allCharacters.value.slice(startValue, startValue + PAGE_SIZE)
+}
+// 角色收藏排在最前（按收藏先后），再按当前页切分 —— 支持跨页排序
 function applyCharacterFavoriteOrder(): void {
   const favored = loadCharFavored()
   const favoredSet = new Set(favored)
   const favoredChars = favored
-    .map((id) => characters.value.find((c) => c.id === id))
+    .map((id) => allCharacters.value.find((c) => c.id === id))
     .filter((c): c is CharacterCardData => !!c)
-  const others = characters.value.filter((c) => !favoredSet.has(c.id))
-  characters.value = [...favoredChars, ...others]
+  const others = allCharacters.value.filter((c) => !favoredSet.has(c.id))
+  allCharacters.value = [...favoredChars, ...others]
+  paginate(currentPage.value)
 }
 const gameStore = useGameStore()
 const uiStore = useUIStore()
@@ -172,48 +187,25 @@ const mapCharacter = (char: ApiCharacter): CharacterCardData => {
   }
 }
 
-const fetchCharacters = async (page: number): Promise<void> => {
+const fetchCharacters = async (): Promise<void> => {
   try {
-    const result = await characterGetAll(page)
-    totalPages.value = result.total_pages
-
-    // 防御：删除角色后当前页可能超出 total_pages（例如停在第 2 页删掉最后一个），
-    // 此时分页条 v-if="totalPages > 1" 整条消失，回退按钮不存在 → 空白列表死锁。
-    // 钳制并重取最后一页。
-    if (currentPage.value > result.total_pages && result.total_pages > 0) {
-      currentPage.value = result.total_pages
-      await fetchCharactersInternal(result.total_pages)
-      return
-    }
-
-    characters.value = result.items.map(mapCharacter)
+    const result = await characterGetAll(1, FETCH_ALL_PAGE_SIZE)
+    allCharacters.value = result.items.map(mapCharacter)
     applyCharacterFavoriteOrder()
   } catch (error) {
     console.error('获取角色列表失败:', error)
+    allCharacters.value = []
     characters.value = []
-  }
-}
-
-// fetchCharacters 的内部调用（钳制回退时用，避免无限递归）
-const fetchCharactersInternal = async (page: number): Promise<void> => {
-  try {
-    const result = await characterGetAll(page)
-    totalPages.value = result.total_pages
-    characters.value = result.items.map(mapCharacter)
-    applyCharacterFavoriteOrder()
-  } catch (error) {
-    console.error('获取角色列表失败:', error)
-    characters.value = []
+    totalPages.value = 1
   }
 }
 
 const loadCharacters = async (): Promise<void> => {
-  await fetchCharacters(currentPage.value)
+  await fetchCharacters()
 }
 
-const changePage = async (page: number): Promise<void> => {
-  currentPage.value = page
-  await fetchCharacters(page)
+const changePage = (page: number): void => {
+  paginate(page)
 }
 
 const { pickAndImport, rescan } = useRoleImportExport()
