@@ -789,6 +789,9 @@ export default {
       title: 'テキスト表示速度',
       label: '遅/速',
     },
+    autoAdvance: {
+      title: '自動送り間隔',
+    },
     sample: {
       title: 'テキストサンプル',
       demo: 'Ling Chat: テキスト表示速度のテスト',
