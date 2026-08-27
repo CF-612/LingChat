@@ -49,7 +49,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          save-if: ${{ github.ref == 'refs/heads/dev' }}
+          save-if: 'true'
 
       - name: 安装 xcodegen
         run: brew install xcodegen
@@ -84,5 +84,5 @@ jobs:
         with:
           name: lingchat-ios-unsigned
           path: |
-            src-tauri/gen/apple/target/**/*.ipa
+            src-tauri/gen/apple/build/**/*.ipa
           retention-days: 7

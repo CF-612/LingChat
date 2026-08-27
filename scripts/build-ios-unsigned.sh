@@ -35,12 +35,14 @@ echo "[build-ios] Step 3/3: pnpm tauri ios build --no-sign (unsigned IPA)"
 pnpm tauri ios build --no-sign "$@"
 
 # --- 4. Locate the artifact ---------------------------------------------------
-IPA="$(find src-tauri/gen/apple/target -name "*.ipa" 2>/dev/null | head -1 || true)"
+# cargo-mobile2 把产物放在 gen/apple/build/<arch>/ 下（如 build/arm64/LingChat.ipa）；
+# 兼容旧目录 gen/apple/target 一并查找
+IPA="$(find src-tauri/gen/apple/build src-tauri/gen/apple/target -name "*.ipa" 2>/dev/null | head -1 || true)"
 if [ -n "$IPA" ]; then
   echo ""
   echo "[build-ios] unsigned IPA ready: $(pwd)/$IPA"
   echo "[build-ios] sideload to iPhone/iPad with Sideloadly / AltStore / 3uTools"
 else
-  echo "[build-ios] ERROR: no .ipa found under src-tauri/gen/apple/target, check the build log above" >&2
+  echo "[build-ios] ERROR: no .ipa found under src-tauri/gen/apple/build or target, check the build log above" >&2
   exit 1
 fi

@@ -44,7 +44,7 @@ node scripts/prepare-bundled-resources.mjs 9  # 2. data.7z → gen/apple/assets/
 pnpm tauri ios build --no-sign             # 3. 构建（beforeBuildCommand 自动跑前端构建）
 ```
 
-产物：`src-tauri/gen/apple/target/**/*.ipa`（无签名）。
+产物：`src-tauri/gen/apple/build/<arch>/LingChat.ipa`（无签名）。
 
 ### CI
 
@@ -117,3 +117,30 @@ macOS runner 实测复现；错误信息中变量名后出现 U+FFFD，文件本
 
 对策：**本仓库的 `.sh` 脚本一律保持纯 ASCII**（注释/输出用英文），
 不要在多字节字符后紧跟变量展开。`.gitattributes` 已强制 `*.sh` 为 LF。
+
+### pnpm 11 在 Xcode "Build Rust Code" 阶段的无 TTY 中止
+
+`tauri ios init` 在 pnpm 环境下会把 Xcode 工程的 "Build Rust Code" 脚本阶段
+渲染为 `pnpm tauri ... xcode-script ...`（tauri-cli 依据 argv[0] 与
+`PNPM_PACKAGE_NAME` 决定 tauri-binary）。pnpm 11 执行脚本前会做依赖校验
+（verify-deps-before-run）并自动跑 `pnpm install`；一旦需要清空 node_modules，
+在无 TTY 环境（Xcode 脚本阶段）直接中止：
+`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` → `xcodebuild exit 65`。
+
+要点：
+- `CI=true` 与 `pnpm_config_verify_deps_before_run` / `pnpm_config_confirm_modules_purge`
+  环境变量（pnpm 11 只认 `pnpm_config_*`/`PNPM_CONFIG_*` 前缀，不认 `PNPM_*`；
+  `.npmrc` 里的这两个键会被 pnpm 11 的 `isNpmrcReadableKey` 过滤）实测都无法阻止；
+- 根治方案：`scripts/configure-ios-project.sh` 在 init 后 patch pbxproj 的
+  shellScript，把开头的 `pnpm tauri ` 替换为
+  `node "$PROJECT_DIR/../../../node_modules/@tauri-apps/cli/tauri.js" `
+  （`$PROJECT_DIR` = `src-tauri/gen/apple`，上三级到仓库根），
+  使 Xcode 脚本阶段直接经 node 调用 tauri CLI，完全绕开包管理器。
+  `tauri ios build` 的 `synchronize_project_config` 不会重写 shellScript，patch 持久生效。
+
+## 构建验证
+
+- 本仓库的 iOS 构建通过 GitHub Actions（`build-ios.yml`，macOS runner）实测：
+  配置工程 → 打包 `data.7z` → `tauri ios build --no-sign`。
+  验证结果以最近一次 workflow run 为准（IPA 见 workflow artifact）。
+
