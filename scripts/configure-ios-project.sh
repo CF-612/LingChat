@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # ============================================================================
-# 配置 LingChat 的 iOS Xcode 工程（仅在 macOS 上运行）。
+# Configure LingChat's iOS Xcode project (macOS only).
 #
-# 职责：
-#   1. 若 src-tauri/gen/apple/ 不存在，执行 `tauri ios init` 生成 Xcode 工程
-#      （内部通过 XcodeGen 生成，产物保留 project.yml 与 <app>.xcodeproj）。
-#   2. 断言/归一化 TARGETED_DEVICE_FAMILY = "1,2"（iPhone + iPad 兼容）。
-#      XcodeGen 默认即 '1,2'，这里显式兜底，满足「兼容 iPhone 和 iPad」要求。
+# Responsibilities:
+#   1. If src-tauri/gen/apple/ does not exist, run `tauri ios init` to
+#      generate the Xcode project (XcodeGen under the hood; keeps project.yml
+#      and <app>.xcodeproj).
+#   2. Normalize TARGETED_DEVICE_FAMILY = "1,2" (iPhone + iPad).
+#      XcodeGen's default is already '1,2'; we force it here to guarantee
+#      iPhone & iPad compatibility.
 #
-# 注意：Windows/Linux 上 tauri-cli 不提供 ios 子命令，本脚本只能在 macOS 执行。
-# 依赖：Xcode（含 Command Line Tools）、xcodegen（brew install xcodegen）、
-#       Rust 目标 aarch64-apple-ios（rustup target add aarch64-apple-ios）。
+# NOTE: tauri-cli does not ship the `ios` subcommand on Windows/Linux, so
+# this script only runs on macOS.
+# Requirements: Xcode (+ Command Line Tools), xcodegen (`brew install xcodegen`),
+# Rust target aarch64-apple-ios (`rustup target add aarch64-apple-ios`).
 # ============================================================================
 set -euo pipefail
 
@@ -19,46 +22,46 @@ cd "$ROOT"
 
 GEN_APPLE="src-tauri/gen/apple"
 
-# ─── 1. 初始化 Xcode 工程 ─────────────────────────────────────
+# --- 1. Initialize the Xcode project ----------------------------------------
 
 if [ ! -d "$GEN_APPLE" ]; then
-  echo "🔧 未找到 $GEN_APPLE，执行 tauri ios init ..."
+  echo "[configure-ios] gen/apple missing, running: pnpm tauri ios init --ci"
   if ! command -v xcodegen >/dev/null 2>&1; then
-    echo "❌ 缺少 xcodegen，请先安装：brew install xcodegen" >&2
+    echo "[configure-ios] ERROR: xcodegen not found. Install it with: brew install xcodegen" >&2
     exit 1
   fi
   pnpm tauri ios init --ci
-  echo "✅ Xcode 工程已生成"
+  echo "[configure-ios] Xcode project generated"
 else
-  echo "ℹ️  已存在 $GEN_APPLE，跳过 init"
+  echo "[configure-ios] $GEN_APPLE already exists, skipping init"
 fi
 
 PBXPROJ="$(ls "$GEN_APPLE"/*.xcodeproj/project.pbxproj 2>/dev/null | head -1 || true)"
 if [ -z "$PBXPROJ" ] || [ ! -f "$PBXPROJ" ]; then
-  echo "❌ 未找到 project.pbxproj，请检查 $GEN_APPLE 下的 Xcode 工程" >&2
+  echo "[configure-ios] ERROR: project.pbxproj not found under $GEN_APPLE" >&2
   exit 1
 fi
 
-# ─── 2. 归一化 TARGETED_DEVICE_FAMILY = "1,2" ────────────────
+# --- 2. Normalize TARGETED_DEVICE_FAMILY = "1,2" (iPhone + iPad) -------------
 
 if grep -q "TARGETED_DEVICE_FAMILY" "$PBXPROJ"; then
-  # BSD sed（macOS 自带）：把所有设备族设置统一为 iPhone + iPad
+  # BSD sed (built into macOS): unify every device-family setting to iPhone + iPad
   sed -i '' -E 's/TARGETED_DEVICE_FAMILY = [^;]+;/TARGETED_DEVICE_FAMILY = "1,2";/g' "$PBXPROJ"
-  echo "✅ TARGETED_DEVICE_FAMILY 已归一化为 \"1,2\"（iPhone + iPad）"
+  echo "[configure-ios] TARGETED_DEVICE_FAMILY normalized to \"1,2\" (iPhone + iPad)"
 else
-  echo "⚠  pbxproj 中未找到 TARGETED_DEVICE_FAMILY（XcodeGen 应默认生成 '1,2'），" \
-    "请打开 Xcode 工程在 Build Settings 中确认 TARGETED_DEVICE_FAMILY = 1,2" >&2
+  echo "[configure-ios] WARNING: TARGETED_DEVICE_FAMILY not found in pbxproj " \
+    "(XcodeGen should generate '1,2' by default). Verify in Xcode Build Settings." >&2
 fi
 
 COUNT="$(grep -c 'TARGETED_DEVICE_FAMILY = "1,2"' "$PBXPROJ" || true)"
-echo "   TARGETED_DEVICE_FAMILY=\"1,2\" 出现 $COUNT 处"
+echo "[configure-ios] TARGETED_DEVICE_FAMILY=\"1,2\" occurrences: $COUNT"
 
-# ─── 3. 校验 iOS 专属 Info.plist 合并钩子 ─────────────────────
+# --- 3. Verify the iOS-specific Info.plist merge hook ------------------------
 
 if [ -f "src-tauri/Info.ios.plist" ]; then
-  echo "ℹ️  src-tauri/Info.ios.plist 存在（文件 App 可见 + 设备族），构建时会自动合并进 Info.plist"
+  echo "[configure-ios] src-tauri/Info.ios.plist present (Files-app visibility + device family); it is merged into Info.plist on every tauri ios build"
 else
-  echo "⚠  缺少 src-tauri/Info.ios.plist（UIFileSharingEnabled 等键将缺失）" >&2
+  echo "[configure-ios] WARNING: src-tauri/Info.ios.plist missing (UIFileSharingEnabled etc. will be absent)" >&2
 fi
 
-echo "✅ iOS 工程配置完成：iPhone + iPad 兼容、数据目录对「文件」App 可见"
+echo "[configure-ios] iOS project configured: iPhone + iPad, data dir visible in the Files app"
