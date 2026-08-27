@@ -134,8 +134,15 @@ fn seed_desktop(
 /// 通过 tauri-plugin-fs 读取打包的 data.7z 并解压到 data_dir。
 ///
 /// 所有游戏资源文件在构建时被打包成一个 7z（ASCII 文件名），
-/// 该 7z 由构建脚本直接放入 Android assets 目录。
-/// 这种方式从根本上避开了 Android asset:// 协议处理中文路径的问题。
+/// 该 7z 由构建脚本放入移动端资源目录。
+/// 这种方式从根本上避开了 asset:// 协议处理中文路径的问题。
+///
+/// 路径差异：
+/// - Android：data.7z 在 APK 的 assets/data/data.7z，resource_dir() 即 assets 根
+///   → 读取 `{resource_dir}/data/data.7z`
+/// - iOS：data.7z 在 `gen/apple/assets/data/data.7z`，XcodeGen 的 folder reference
+///   会把 `assets/` **整个目录**拷进 app bundle（保留目录名），resource_dir() 是
+///   bundle 根 → 读取 `{resource_dir}/assets/data/data.7z`
 #[cfg(any(target_os = "android", target_os = "ios"))]
 fn seed_via_fs_plugin(app: &tauri::AppHandle, data_dir: &std::path::Path) -> anyhow::Result<()> {
     use anyhow::Context;
@@ -151,7 +158,11 @@ fn seed_via_fs_plugin(app: &tauri::AppHandle, data_dir: &std::path::Path) -> any
     let base = base.trim_end_matches('/');
 
     // 读取 data.7z（唯一需要从 asset:// 读取的文件，纯 ASCII 路径）
+    #[cfg(target_os = "ios")]
+    let archive_asset = format!("{}/assets/data/data.7z", base);
+    #[cfg(not(target_os = "ios"))]
     let archive_asset = format!("{}/data/data.7z", base);
+
     let archive_bytes = app
         .fs()
         .read(std::path::Path::new(&archive_asset))

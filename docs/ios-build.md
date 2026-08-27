@@ -84,12 +84,13 @@ IPA 作为 workflow artifact 上传（保留 7 天）。
 
 | 内容 | 机制 | 落点 |
 |---|---|---|
-| 游戏数据 + 模型 | `prepare-bundled-resources.mjs` 打包 `data.7z` → `gen/apple/assets/data/data.7z` | `<bundle>/data/data.7z`，首启解压到 Documents |
+| 游戏数据 + 模型 | `prepare-bundled-resources.mjs` 打包 `data.7z` → `gen/apple/assets/data/data.7z` | `<bundle>/assets/data/data.7z`（folder reference 保留 `assets/` 目录名），首启解压到 Documents |
 | 桌面 `.official` 资源 | `prepare-desktop-resources.mjs` 在移动端（`TAURI_ENV_PLATFORM=ios/android`）**只生成空占位** | 不进包（避免与 data.7z 重复） |
 
-`gen/apple/assets/` 在 project.yml 中是 folder reference（`type: folder`），构建时整体
-拷入 bundle 根目录，因此 `assets/data/data.7z` → `<bundle>/data/data.7z`，与 Rust 读取路径
-`{resource_dir}/data/data.7z` 一致。
+`gen/apple/assets/` 在 project.yml 中是 folder reference（`type: folder`），构建时**连同目录名**拷入
+bundle（`assets/data/data.7z` → `<bundle>/assets/data/data.7z`）。
+Rust 侧 `seed_via_fs_plugin` 的 iOS 读取路径为 `{resource_dir}/assets/data/data.7z`
+（Android 为 `{resource_dir}/data/data.7z`，因为 APK 的 resource_dir 就是 assets 根）。
 
 > 兼容性说明：`prepare-desktop-resources.mjs` 的 `isMobile` 跳过逻辑对 Android 同样生效，
 > Android APK 也会因此去掉重复打包的 `.official` 文件（移动端播种本就只认 data.7z）。
