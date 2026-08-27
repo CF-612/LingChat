@@ -21,7 +21,7 @@ pub fn get_data_dir() -> &'static PathBuf {
 ///
 /// 优先级：
 /// 1. Android：应用专属外部存储 (/storage/emulated/0/Android/data/<package>/files)
-/// 2. iOS：平台沙盒内的应用数据目录
+/// 2. iOS：沙盒 Documents 目录（配合 Info.ios.plist 的文件共享键，「文件」App 可见）
 /// 3. 桌面端开发模式（debug）：项目根目录下的 `data/`
 /// 4. 桌面端发布模式（release portable）：exe 所在目录下的 `data/`
 fn resolve_data_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -43,10 +43,15 @@ fn resolve_data_dir_impl(app: &tauri::AppHandle) -> PathBuf {
 #[cfg(target_os = "ios")]
 fn resolve_data_dir_impl(app: &tauri::AppHandle) -> PathBuf {
     use tauri::Manager;
-    // iOS 继续使用沙盒路径
+    // iOS：使用沙盒内的 Documents 目录（<container>/Documents）。
+    // 配合 src-tauri/Info.ios.plist 中的 UIFileSharingEnabled /
+    // LSSupportsOpeningDocumentsInPlace，用户可以在系统「文件」App 里
+    // 直接看到并访问整个 data/ 目录（游戏数据、语音、截图等）。
+    // 注意不要改回 app_data_dir()（Library/Application Support），
+    // 那部分对「文件」App 不可见。
     app.path()
-        .app_data_dir()
-        .expect("failed to resolve app_data_dir on iOS")
+        .document_dir()
+        .expect("failed to resolve document_dir on iOS")
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]

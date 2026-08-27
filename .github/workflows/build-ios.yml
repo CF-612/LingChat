@@ -1,0 +1,73 @@
+name: iOS 无签名 IPA 构建
+
+on:
+  workflow_dispatch:
+    inputs:
+      compression:
+        description: 'data.7z 压缩等级（0-9）'
+        required: false
+        default: '9'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      # 移动端构建必须启用：让 webview 从应用内嵌资产加载前端
+      # （tauri CLI 会在 iOS 构建时自动附加 custom-protocol feature）
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: 's'
+      CARGO_PROFILE_RELEASE_STRIP: 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: 拉取 LFS 资源（游戏数据 + 图标）
+        run: |
+          git lfs pull --include="data/game_data/**,src-tauri/icons/**"
+
+      - uses: pnpm/setup@v1
+        with:
+          runtime: node@26
+          cache: true
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: 设置 rust 缓存
+        uses: swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/dev' }}
+
+      - name: 安装 xcodegen
+        run: brew install xcodegen
+
+      - name: 初始化（图标 + 下载情绪模型）
+        run: |
+          pnpm install
+          pnpm run init
+
+      - name: 初始化并配置 iOS Xcode 工程（iPhone + iPad）
+        run: bash scripts/configure-ios-project.sh
+
+      - name: 打包默认资源 data.7z
+        run: node scripts/prepare-bundled-resources.mjs ${{ github.event.inputs.compression }}
+
+      - name: 构建无签名 IPA
+        # beforeBuildCommand 会自动执行 prepare-desktop-resources.mjs + pnpm build；
+        # --no-sign 跳过代码签名（无需证书/描述文件）
+        run: pnpm tauri ios build --no-sign
+
+      - name: 上传 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: lingchat-ios-unsigned
+          path: |
+            src-tauri/gen/apple/target/**/*.ipa
+          retention-days: 7
