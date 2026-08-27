@@ -140,7 +140,12 @@ macOS runner 实测复现；错误信息中变量名后出现 U+FFFD，文件本
 
 ## 构建验证
 
-- 本仓库的 iOS 构建通过 GitHub Actions（`build-ios.yml`，macOS runner）实测：
-  配置工程 → 打包 `data.7z` → `tauri ios build --no-sign`。
-  验证结果以最近一次 workflow run 为准（IPA 见 workflow artifact）。
+- 本仓库的 iOS 构建已在 GitHub Actions（`build-ios.yml`，macOS arm64 runner）上
+  **实测通过**：配置工程 → 打包 `data.7z` → `tauri ios build --no-sign` 产出无签名
+  IPA（`src-tauri/gen/apple/build/arm64/LingChat.ipa`，约 170 MB，含前端 + Rust +
+  情绪模型 data.7z），并作为 workflow artifact `lingchat-ios-unsigned` 上传。
+- 实测过程中修复的三个平台级问题（见上文踩坑记录）：
+  1. macOS bash 3.2 多字节解析 bug → `.sh` 脚本纯 ASCII；
+  2. pnpm 11 在 Xcode 脚本阶段无 TTY 中止 → patch pbxproj 绕开 pnpm；
+  3. IPA 产物路径为 `gen/apple/build/<arch>/`（非 `gen/apple/target/`）。
 
