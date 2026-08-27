@@ -69,6 +69,7 @@ import {
   SettingsAdventure,
   SettingsLog,
   SettingsPlugins,
+  SettingsCast,
 } from './pages'
 import SettingsNav from './SettingsNav.vue'
 import { useUIStore } from '../../stores/modules/ui/ui'
@@ -186,6 +187,7 @@ const TABS = [
   'advance',
   'log',
   'plugins',
+  'cast',
 ] as const
 
 // 标签 → 组件映射（推入推出转场用 v-if 动态组件）
@@ -201,6 +203,7 @@ const tabComponents: Record<string, Component> = {
   background: SettingsBackground,
   log: SettingsLog,
   plugins: SettingsPlugins,
+  cast: SettingsCast,
 }
 const currentTabComponent = computed(() => tabComponents[uiStore.currentSettingsTab])
 // 转场方向：左滑下一项 → slide-left（新页从右进）；右滑上一项 → slide-right

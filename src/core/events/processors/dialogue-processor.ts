@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import type { IEventProcessor } from '../event-processor'
 import type { ScriptDialogueEvent } from '../../../types'
 import { useGameStore } from '../../../stores/modules/game'
@@ -62,6 +63,11 @@ export default class DialogueProcessor implements IEventProcessor {
     role.originalEmotion = event.originalTag || '正常'
     gameStore.currentInteractRoleId = role.roleId
     uiStore.currentAvatarAudio = event.audioFile || 'None'
+    // 前端触发对话/播放回复音频时，把该句语音广播给投屏客户端（远端设备同步播放）。
+    // 仅主窗口处理 ai:reply 事件，这里每句回复恰好执行一次；投屏服务未运行时命令内 no-op。
+    if (event.audioFile) {
+      invoke('cast_play_voice', { audioFile: event.audioFile }).catch(() => {})
+    }
     uiStore.showCharacterEmotion = role.originalEmotion
 
     uiStore.showCharacterTitle = displayName

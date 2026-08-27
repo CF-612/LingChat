@@ -1,7 +1,10 @@
 import { createApp } from "vue";
 import pinia from "./stores";
 import { initializeEventProcessors } from "./core/events";
-import { initializeTauriEventListeners } from "./api/tauri-events";
+import {
+  initializeTauriEventListeners,
+  initializeCastWindowListeners,
+} from "./api/tauri-events";
 
 import App from "./App.vue";
 import "./assets/styles/base.css";
@@ -25,7 +28,15 @@ if (getCurrentWindow().label === 'main') {
 const app = createApp(App);
 
 initializeEventProcessors();
-initializeTauriEventListeners();
+
+// 投屏窗口是独立 webview：不注册驱动事件队列的全局监听（ai:reply 等），
+// 台词由主窗口镜像（cast:mirror）驱动，只注册投屏需要的即时状态事件。
+const isCastWindow = new URLSearchParams(window.location.search).get('window') === 'cast';
+if (isCastWindow) {
+  initializeCastWindowListeners();
+} else {
+  initializeTauriEventListeners();
+}
 
 app.use(pinia);
 app.use(i18n);
@@ -34,6 +45,11 @@ app.use(router);
 // 独立日志窗口：通过 index.html?window=log 打开时直接进入日志路由
 if (new URLSearchParams(window.location.search).get('window') === 'log') {
   router.replace('/log-window');
+}
+
+// 投屏窗口：通过 index.html?window=cast 打开时直接进入投屏路由
+if (isCastWindow) {
+  router.replace('/cast');
 }
 
 app.mount("#app");

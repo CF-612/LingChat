@@ -8,12 +8,16 @@
       :active-speaker-id="gameStore.currentInteractRoleId"
       :audio-element="mainAudio"
       :voice-data-url="voiceDataUrl"
+      :cast-scale="castScale"
+      :cast-offset-y="castOffsetY"
     >
       <!-- 2. 每个角色保留原有静态视觉、气泡和触摸层 -->
       <RoleAvatar
         v-for="role in gameStore.presentRolesList"
         :key="role.roleId"
         :role="role"
+        :cast-scale="castScale"
+        :cast-offset-y="castOffsetY"
       />
     </Live2DStage>
 
@@ -41,6 +45,18 @@ import Live2DStage from '../live2d/Live2DStage.vue'
 const gameStore = useGameStore()
 const uiStore = useUIStore()
 const emit = defineEmits(['audio-ended', 'audio-started'])
+
+/** 投屏全局缩放与偏移（仅投屏窗口传入；主窗口缺省无影响）。
+    水平偏移由投屏窗口 .cast-role-layer 的 CSS translateX 整层平移，不在此处理。 */
+const props = withDefaults(
+  defineProps<{
+    /** 投屏全局缩放（作用于 Live2D / 立绘布局，保持贴底定位） */
+    castScale?: number
+    /** 投屏全局垂直偏移（像素，正值下移；布局内夹紧，下移触底即止） */
+    castOffsetY?: number
+  }>(),
+  { castScale: 1, castOffsetY: 0 },
+)
 
 const mainAudio = ref<HTMLAudioElement | null>(null)
 const voiceDataUrl = ref('')

@@ -428,7 +428,7 @@ async fn send_udp_broadcast(my_instance_id: &str) -> Result<Vec<PeerInfo>, Strin
 /// - 排除虚拟网卡 / 特殊网段（Hyper-V、WSL、VPN、Docker 等）
 /// - 优先返回常见局域网地址（192.168.x.x / 10.x.x.x / 172.16-31.x.x）
 /// - 其余非排除地址排在末尾
-fn get_local_ips() -> Result<Vec<String>, String> {
+pub fn get_local_ips() -> Result<Vec<String>, String> {
     let ifaces =
         if_addrs::get_if_addrs().map_err(|e| format!("获取网卡列表失败: {e}"))?;
 

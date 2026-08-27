@@ -127,6 +127,16 @@
       >
         <p class="hidden xl:block whitespace-nowrap">{{ $t('nav.plugins') }}</p>
       </Button>
+      <Button
+        ref="castBtn"
+        type="nav"
+        class="shrink-0"
+        icon="cast"
+        @click="() => switchTab('cast', 'castBtn')"
+        :class="{ active: uiStore.currentSettingsTab === 'cast' }"
+      >
+        <p class="hidden xl:block whitespace-nowrap">{{ $t('nav.cast') }}</p>
+      </Button>
     </nav>
     <Icon
       icon="close"
@@ -171,6 +181,7 @@ const updateBtn = ref<ButtonRef | null>(null)
 const adventureBtn = ref<ButtonRef | null>(null)
 const logBtn = ref<ButtonRef | null>(null)
 const pluginsBtn = ref<ButtonRef | null>(null)
+const castBtn = ref<ButtonRef | null>(null)
 
 // 设置可重设的值（使用 ref 存储，确保响应式或跨函数访问）
 const oldRefName = ref('textBtn')
@@ -191,6 +202,7 @@ const handleIndicatorMove = (currentRefName: string) => {
     adventureBtn,
     logBtn,
     pluginsBtn,
+    castBtn,
   }[currentRefName]
 
   if (buttonRef?.value?.$el) {
@@ -289,6 +301,9 @@ const initIndicator = () => {
       break
     case 'plugins':
       activeButton = pluginsBtn.value
+      break
+    case 'cast':
+      activeButton = castBtn.value
       break
   }
 

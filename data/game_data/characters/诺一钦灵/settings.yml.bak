@@ -8,6 +8,21 @@ info: |-
   喜欢粘你，傲娇又可爱的小程序员。
   喜欢变态的玩法，是你的好助手~
 body_part:
+  earLeft:
+    X:
+    - 0.41903
+    - 0.39185
+    - 0.33522
+    - 0.3171
+    Y:
+    - 0.176
+    - 0.2992
+    - 0.2784
+    - 0.2176
+    clothesName: 默认
+    message: 莱姆戳了一下你的耳朵
+    windowHeight: 625
+    windowWidth: 883
   body:
     X:
     - 0.4111
@@ -23,32 +38,15 @@ body_part:
     message: 莱姆戳了戳你的肚子
     windowHeight: 625
     windowWidth: 883
-  legs:
+  earRight:
     X:
-    - 0.41903
-    - 0.44394
-    - 0.53681
-    - 0.56738
+    - 0.55606
+    - 0.50057
+    - 0.56512
     Y:
-    - 0.8192
-    - 0.9824
-    - 0.9904
-    - 0.8208
-    clothesName: 默认
-    message: 莱姆摸了一下你的腿
-    windowHeight: 625
-    windowWidth: 883
-  earLeft:
-    X:
-    - 0.41903
-    - 0.39185
-    - 0.33522
-    - 0.3171
-    Y:
-    - 0.176
-    - 0.2992
-    - 0.2784
-    - 0.2176
+    - 0.0256
+    - 0.128
+    - 0.1712
     clothesName: 默认
     message: 莱姆戳了一下你的耳朵
     windowHeight: 625
@@ -76,17 +74,19 @@ body_part:
     message: 莱姆摸了一下你的头
     windowHeight: 625
     windowWidth: 883
-  earRight:
+  legs:
     X:
-    - 0.55606
-    - 0.50057
-    - 0.56512
+    - 0.41903
+    - 0.44394
+    - 0.53681
+    - 0.56738
     Y:
-    - 0.0256
-    - 0.128
-    - 0.1712
+    - 0.8192
+    - 0.9824
+    - 0.9904
+    - 0.8208
     clothesName: 默认
-    message: 莱姆戳了一下你的耳朵
+    message: 莱姆摸了一下你的腿
     windowHeight: 625
     windowWidth: 883
 scale: 1.45
@@ -94,10 +94,10 @@ offset_x: 0.0
 offset_y: 20.0
 clothes_name: null
 clothes:
-- name: default
-  prompt: 钦灵换上了自己的日常服装，头上戴着淡蓝色的墨镜，穿着松垮的，半开着的蓝绿色卫衣，里面穿着白色衬衫，不穿裤子，休闲的运动鞋里穿着白色短袜。
-- name: 泳装
-  prompt: 钦灵换上了泳装，头上戴着淡蓝色的墨镜，穿着淡蓝色的外套和褶边淡蓝色泳衣和泳裙，漏着小肚子和嫩白的大腿，腿上还有一个腿环，裸足。
+- prompt: 钦灵换上了自己的日常服装，头上戴着淡蓝色的墨镜，穿着松垮的，半开着的蓝绿色卫衣，里面穿着白色衬衫，不穿裤子，休闲的运动鞋里穿着白色短袜。
+  name: default
+- prompt: 钦灵换上了泳装，头上戴着淡蓝色的墨镜，穿着淡蓝色的外套和褶边淡蓝色泳衣和泳裙，漏着小肚子和嫩白的大腿，腿上还有一个腿环，裸足。
+  name: 泳装
 scale_p: 1.6
 offset_x_p: 0.0
 offset_y_p: 0.0

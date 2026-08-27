@@ -161,6 +161,24 @@
         </Toggle>
       </MenuItem>
 
+      <!-- Vue DevTools 显示开关：仅开发模式（vite-plugin-vue-devtools 只在 serve 注入），
+           全局所有窗口（主窗 / 投屏 / 日志 / 桌宠）都生效 -->
+      <MenuItem
+        v-if="isDevMode"
+        :title="$t('settings.text.vueDevTools.title')"
+        size="small"
+      >
+        <template #header>
+          <Bug :size="20" />
+        </template>
+        <Toggle
+          :checked="settingsStore.text.vueDevToolsEnabled"
+          @change="toggleVueDevTools"
+        >
+          {{ $t('settings.text.vueDevTools.desc') }}
+        </Toggle>
+      </MenuItem>
+
       <MenuItem
         :title="$t('settings.text.memory.title')"
         size="small"
@@ -647,6 +665,7 @@ import {
   Import,
   Gauge,
   Timer,
+  Bug,
 } from 'lucide-vue-next'
 import {
   codexAuthStatus,
@@ -675,6 +694,8 @@ import type { DialogView } from '@/types/lanSync'
 
 const router = useRouter()
 const { t } = useI18n()
+// 模板里不能用 import.meta（模板表达式按非 module 解析），这里提前取出
+const isDevMode = import.meta.env.DEV
 const uiStore = useUIStore()
 const roleStore = useRoleArchiveStore()
 const settingsStore = useSettingsStore()
@@ -1175,6 +1196,10 @@ const toggleInlineMotionText = (data: boolean) => {
 
 const toggleSedentaryReminder = (data: boolean) => {
   settingsStore.update('text.sedentaryReminder', data)
+}
+
+const toggleVueDevTools = (data: boolean) => {
+  settingsStore.update('text.vueDevToolsEnabled', data)
 }
 
 const handleMemorySettingChange = (checked: boolean, setting: ConfigItem) => {

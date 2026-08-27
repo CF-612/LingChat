@@ -44,6 +44,12 @@ const props = defineProps<{
   activeSpeakerId: number | null
   audioElement: HTMLAudioElement | null
   voiceDataUrl: string
+  /** 投屏全局缩放：乘在角色基础 scale 上，作用于 Live2D 模型本体
+      （标准模式下仅投屏窗口传入，主窗口缺省为 1，无影响） */
+  castScale?: number
+  /** 投屏全局垂直偏移（像素，正值下移；标准模式下仅投屏窗口传入，主窗口缺省 0）。
+      水平偏移由投屏窗口 .cast-role-layer 的 CSS translateX 整层平移，不在此处理。 */
+  castOffsetY?: number
 }>()
 
 const emit = defineEmits<{
@@ -261,13 +267,25 @@ function applyLayout(entry: RoleModel, role: GameRole) {
     const index = props.roles.findIndex((item) => item.roleId === role.roleId)
     const count = props.roles.length
     const xPercent = index < 0 ? 0.5 : (index + 1) / (count + 1)
-    const roleScale = role.scale || 1
+    // 投屏 scale 折进原公式里的 roleScale（与 model.scale / position.y 同步相乘，
+    // 保持贴底定位）；主窗口缺省 castScale=1，行为与原先完全一致
+    const roleScale = (role.scale || 1) * (props.castScale ?? 1)
     const baseScale = application.screen.height / height
     model.anchor.set(0.5, 1)
     model.scale.set(baseScale * roleScale)
+    // 投屏垂直偏移（castOffsetY，正值下移）折进角色脚底位置，但只夹紧「投屏自己下移
+    // 的那段」：角色自身配置的 role.offsetY 不参与夹紧，保持原语义。脚底默认在
+    // H*roleScale + role.offsetY；投屏下移最多补到窗口底沿（脚底触底即止），人物下方
+    // 不会被窗口 overflow:hidden 截断；上移（负值）自由。水平偏移由投屏窗口的
+    // .cast-role-layer CSS translateX 整层平移（见 CastWindow.vue）。
+    const defaultFootY = application.screen.height * roleScale + (role.offsetY || 0)
+    const downLimit = application.screen.height - defaultFootY
+    const castOffsetY = props.castOffsetY ?? 0
+    const effectiveOffsetY =
+      castOffsetY > 0 ? Math.min(castOffsetY, Math.max(0, downLimit)) : castOffsetY
     model.position.set(
       application.screen.width * xPercent + (role.offsetX || 0),
-      application.screen.height * roleScale + (role.offsetY || 0),
+      defaultFootY + effectiveOffsetY,
     )
   }
   model.visible = role.show
@@ -564,6 +582,13 @@ watch(
     ),
   queueSync,
   { deep: true },
+)
+
+// 投屏全局缩放 / 垂直偏移变化时重新布局（滑块拖动即时生效，复用 queueSync 幂等重排；
+// 水平偏移由投屏窗口 CSS translateX 处理，不在此触发）
+watch(
+  () => [props.castScale, props.castOffsetY] as const,
+  queueSync,
 )
 
 watch(

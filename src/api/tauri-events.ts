@@ -435,3 +435,49 @@ export function initializeTauriEventListeners() {
     '[Tauri] Event listeners initialized (ai + ai:thinking_progress + tts:cleanup + adventure + auto-save + 13 script events + character:switch + scene:switch)',
   )
 }
+
+/**
+ * 投屏窗口专用的精简事件监听。
+ *
+ * 投屏窗口是独立的 webview，事件队列与主窗口各自独立。台词/标题/情绪
+ * 完全由主窗口的镜像事件（cast:mirror，见 App.vue）驱动——若这里也注册
+ * ai:reply 等会驱动队列的监听，投屏就会「按消息到达时间显示」而与主界面
+ * 脱节。这里只注册投屏需要的即时状态事件：
+ * - scene:switch / character:switch：背景、场景光照、立绘即时同步
+ * （其余场景状态由 CastWindow 的 2s 快照对账兜底）。
+ */
+export function initializeCastWindowListeners() {
+  listen('character:switch', async (event) => {
+    const payload = event.payload as { type: string; roleId: number; characterName: string }
+    const gameStore = useGameStore()
+    const uiStore = useUIStore()
+    const role = await gameStore.getOrCreateGameRole(payload.roleId)
+    gameStore.currentInteractRoleId = payload.roleId
+    if (!gameStore.presentRoleIds.includes(payload.roleId)) {
+      gameStore.presentRoleIds = [payload.roleId]
+    }
+    uiStore.showCharacterTitle = role.roleName
+    uiStore.showCharacterSubtitle = role.roleSubTitle
+  })
+
+  listen('scene:switch', (event) => {
+    const payload = event.payload as { type: string; scene: SceneInfo }
+    const gameStore = useGameStore()
+    const uiStore = useUIStore()
+    gameStore.setCurrentScene(payload.scene)
+    uiStore.setCurrentBackground(payload.scene.background ?? '')
+  })
+
+  // 投屏客户端麦克风经投屏 /ws 送到 Rust ASR，识别文本由这里注入对话。
+  // 复用既有 asr-send 自定义事件 → GameDialog.onAsrAutoSend → send()（sendMessage）。
+  // 仅投屏窗口注册此监听（主窗口不注册），保证每次识别恰好注入一次。
+  listen('cast:mic:recognized', (event) => {
+    const { text } = event.payload as { text: string }
+    if (!text) return
+    window.dispatchEvent(new CustomEvent('asr-send', { detail: text }))
+  })
+
+  console.log(
+    '[Tauri] Cast window listeners initialized (scene:switch + character:switch + cast:mic:recognized)',
+  )
+}

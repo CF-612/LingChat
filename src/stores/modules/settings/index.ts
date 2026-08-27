@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS = {
     inlineMotionText: false, // 内联动作文本（单次显示台词+灰字动作）
     sedentaryReminder: false, // 久坐喝水提醒
     fontFamily: '', // 自定义界面字体名（为空走系统默认栈；初始菜单/加载页不受影响）
+    vueDevToolsEnabled: true, // Vue DevTools 悬浮面板显示开关（仅开发模式生效，全局所有窗口）
   },
   // 音频设置
   audio: {
@@ -73,6 +74,7 @@ export interface TextSettings {
   inlineMotionText: boolean
   sedentaryReminder: boolean
   fontFamily: string
+  vueDevToolsEnabled: boolean
 }
 export interface AudioSettings {
   characterVolume: number
