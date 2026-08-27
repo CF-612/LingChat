@@ -55,21 +55,9 @@ jobs:
 
       - name: 初始化并配置 iOS Xcode 工程（iPhone + iPad）
         run: |
-          echo "=== bash version ==="
-          bash --version | head -1
-          echo "=== git config core.autocrlf ==="
-          git config --get core.autocrlf || echo "(unset)"
-          echo "=== check-attr ==="
-          git check-attr text eol working-tree-encoding -- scripts/configure-ios-project.sh || true
-          echo "=== blob sha vs worktree sha ==="
+          echo "=== blob sha vs worktree sha (must be equal) ==="
           git rev-parse HEAD:scripts/configure-ios-project.sh
           git hash-object scripts/configure-ios-project.sh
-          echo "=== file type ==="
-          file scripts/configure-ios-project.sh
-          echo "=== od -c (first 32 lines) ==="
-          od -c scripts/configure-ios-project.sh | head -32
-          echo "=== cat -A (first 12 lines) ==="
-          cat -A scripts/configure-ios-project.sh | head -12
           echo "=== run configure script ==="
           bash scripts/configure-ios-project.sh
 
@@ -77,8 +65,8 @@ jobs:
         run: node scripts/prepare-bundled-resources.mjs ${{ github.event.inputs.compression }}
 
       - name: 构建无签名 IPA
-        # beforeBuildCommand 会自动执行 prepare-desktop-resources.mjs + pnpm build；
-        # --no-sign 跳过代码签名（无需证书/描述文件）
+        # beforeBuildCommand runs prepare-desktop-resources.mjs + pnpm build automatically;
+        # --no-sign skips code signing (no certificate / provisioning profile needed)
         run: pnpm tauri ios build --no-sign
 
       - name: 上传 IPA

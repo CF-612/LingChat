@@ -10,7 +10,7 @@
 #      produce an UNSIGNED IPA (tauri-cli has a built-in create_ipa step)
 #
 # Output: src-tauri/gen/apple/target/**/*.ipa
-#   Install via sideloading tools (Sideloadly / AltStore / 爱思助手) or sign it
+#   Install via sideloading tools (Sideloadly / AltStore / 3uTools) or sign it
 #   with a developer certificate for distribution.
 #
 # Requirements (macOS only): Xcode, xcodegen, Rust target aarch64-apple-ios
