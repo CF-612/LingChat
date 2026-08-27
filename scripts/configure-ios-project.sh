@@ -76,7 +76,8 @@ fi
 
 if grep -q 'shellScript = "pnpm tauri ' "$PBXPROJ"; then
   # 用 | 作 sed 分隔符避免转义 /；\\" 在 pbxproj 字符串内输出 \"（嵌套引号）
-  sed -i '' 's|shellScript = "pnpm tauri |shellScript = "node \\"$PROJECT_DIR/../../node_modules/@tauri-apps/cli/tauri.js\\" |g' "$PBXPROJ"
+  # $PROJECT_DIR = src-tauri/gen/apple，需要 ../../.. 三级回到仓库根
+  sed -i '' 's|shellScript = "pnpm tauri |shellScript = "node \\"$PROJECT_DIR/../../../node_modules/@tauri-apps/cli/tauri.js\\" |g' "$PBXPROJ"
   echo "[configure-ios] Build Rust Code phase patched: pnpm tauri -> node tauri.js (bypass pnpm)"
 else
   echo "[configure-ios] Build Rust Code phase: no 'pnpm tauri' prefix found (already patched or not pnpm-wrapped)"
