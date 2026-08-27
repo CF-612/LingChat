@@ -64,4 +64,27 @@ else
   echo "[configure-ios] WARNING: src-tauri/Info.ios.plist missing (UIFileSharingEnabled etc. will be absent)" >&2
 fi
 
+# --- 4. Bypass pnpm in the "Build Rust Code" Xcode phase ---------------------
+# tauri ios init 在 pnpm 环境下会把 tauri-binary 渲染为 `pnpm`，于是 Xcode 脚本
+# 阶段执行 `pnpm tauri ... xcode-script ...`。pnpm 11 的 verify-deps-before-run
+# 会先跑一次自动 `pnpm install`；模块目录需要清空重装时，在无 TTY 环境下直接
+# 中止（ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY -> xcodebuild exit 65）。
+# CI=true 与 pnpm_config_* 环境变量都无法阻止（Xcode 脚本阶段不继承/或该检查
+# 无视它们）。这里把 shellScript 开头的 `pnpm tauri` 替换为直接调用本仓库的
+# tauri.js shim（node 直跑，等价于 pnpm tauri 但完全绕开包管理器）。
+# tauri ios build 的 synchronize_project_config 不会重写 shellScript，patch 持久生效。
+
+if grep -q 'shellScript = "pnpm tauri ' "$PBXPROJ"; then
+  # 用 | 作 sed 分隔符避免转义 /；\\" 在 pbxproj 字符串内输出 \"（嵌套引号）
+  sed -i '' 's|shellScript = "pnpm tauri |shellScript = "node \\"$PROJECT_DIR/../../node_modules/@tauri-apps/cli/tauri.js\\" |g' "$PBXPROJ"
+  echo "[configure-ios] Build Rust Code phase patched: pnpm tauri -> node tauri.js (bypass pnpm)"
+else
+  echo "[configure-ios] Build Rust Code phase: no 'pnpm tauri' prefix found (already patched or not pnpm-wrapped)"
+fi
+
+# --- 5. Show the patched shell script for verification -----------------------
+
+echo "[configure-ios] Build Rust Code shellScript (first 220 chars):"
+grep -o 'shellScript = ".*' "$PBXPROJ" | head -3 | cut -c1-220 || true
+
 echo "[configure-ios] iOS project configured: iPhone + iPad, data dir visible in the Files app"
