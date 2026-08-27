@@ -67,6 +67,10 @@ jobs:
       - name: 构建无签名 IPA
         # beforeBuildCommand runs prepare-desktop-resources.mjs + pnpm build automatically;
         # --no-sign skips code signing (no certificate / provisioning profile needed)
+        env:
+          # pnpm 11 在 Xcode 的 Build Rust Code 脚本里做依赖校验时会触发自动 install；
+          # 显式 CI=true + .npmrc 的 verify-deps-before-run=false 避免无 TTY 中止
+          CI: "true"
         run: pnpm tauri ios build --no-sign
 
       - name: 上传 IPA
