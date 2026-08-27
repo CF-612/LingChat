@@ -19,6 +19,12 @@ jobs:
       # （tauri CLI 会在 iOS 构建时自动附加 custom-protocol feature）
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 's'
       CARGO_PROFILE_RELEASE_STRIP: 'true'
+      # pnpm 11 在 Xcode 的 Build Rust Code 脚本（无 TTY）里会做依赖校验并触发
+      # 自动 pnpm install，模块目录需清空时直接中止（ERR_PNPM_ABORTED_..._NO_TTY）。
+      # 用 pnpm_config_ 前缀的环境变量关闭（.npmrc 中的同名键会被 pnpm 11 过滤）。
+      pnpm_config_verify_deps_before_run: 'false'
+      pnpm_config_confirm_modules_purge: 'false'
+      CI: 'true'
 
     steps:
       - uses: actions/checkout@v4
