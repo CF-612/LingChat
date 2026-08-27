@@ -102,3 +102,18 @@ IPA 作为 workflow artifact 上传（保留 7 天）。
   `pnpm run ios:build` 的实际结果为准；
 - ort（ONNX Runtime）在 iOS 有官方预编译产物（`aarch64-apple-ios`），
   已确认可编译链接，无需额外配置。
+
+## 踩坑记录
+
+### macOS 自带 bash 3.2 的多字节解析 bug
+
+macOS 自带 `/bin/bash` 是 3.2.57，存在多字节（UTF-8）解析缺陷：
+**双引号内 `$VAR` 紧跟多字节字符（如全角逗号 `，`）时，bash 会把多字节字节串
+错误并入变量名**，`set -u` 下报 `VAR<乱码>: unbound variable`（即使变量已赋值）。
+
+例：`echo "未找到 $GEN_APPLE，执行..."` 在 bash 3.2 上触发该 bug（GitHub Actions
+macOS runner 实测复现；错误信息中变量名后出现 U+FFFD，文件本身经字节级校验为
+干净 LF UTF-8，与 CRLF 无关）。
+
+对策：**本仓库的 `.sh` 脚本一律保持纯 ASCII**（注释/输出用英文），
+不要在多字节字符后紧跟变量展开。`.gitattributes` 已强制 `*.sh` 为 LF。
