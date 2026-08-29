@@ -43,6 +43,7 @@ export async function createVoice(
   name: string,
   model: string,
   filePath: string,
+  language: string,
   onProgress: (phase: string) => void,
 ): Promise<CosyVoiceRecord> {
   const channel = new Channel<CosyvoiceProgress>()
@@ -51,6 +52,7 @@ export async function createVoice(
     name,
     model,
     filePath,
+    language,
     channel,
   })
 }
@@ -59,8 +61,9 @@ export function createVoiceFromUrl(
   name: string,
   model: string,
   url: string,
+  language: string,
 ): Promise<CosyVoiceRecord> {
-  return invoke<CosyVoiceRecord>('cosyvoice_create_voice_from_url', { name, model, url })
+  return invoke<CosyVoiceRecord>('cosyvoice_create_voice_from_url', { name, model, url, language })
 }
 
 export function listVoices(): Promise<CosyVoiceView[]> {

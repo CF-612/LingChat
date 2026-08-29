@@ -55,6 +55,7 @@ impl CloudVoiceService {
         model: &str,
         name: &str,
         file_path: &Path,
+        language: &str,
         progress: impl Fn(&str),
     ) -> Result<CosyVoiceRecord> {
         let prefix = sanitize_prefix(name);
@@ -62,12 +63,20 @@ impl CloudVoiceService {
         let url = upload_audio(&self.api_key, model, file_path).await?;
         progress("提交复刻任务…");
         tracing::info!(
-            "CosyVoice 创建音色: model={} prefix={} name={}",
+            "CosyVoice 创建音色: model={} prefix={} name={} lang={}",
             model,
             prefix,
-            name
+            name,
+            language
         );
-        let voice_id = create_voice(&self.api_key, model, &prefix, &url, Some(&["zh"])).await?;
+        let voice_id = create_voice(
+            &self.api_key,
+            model,
+            &prefix,
+            &url,
+            Some(&[language]),
+        )
+        .await?;
         progress("音色处理中（约需几十秒）…");
         poll_until_ready(
             &mut |voice_id: String| async move {
@@ -90,15 +99,29 @@ impl CloudVoiceService {
     }
 
     /// 公网 URL 注册（兜底路径）。
-    pub async fn create_from_url(&self, model: &str, name: &str, url: &str) -> Result<CosyVoiceRecord> {
+    pub async fn create_from_url(
+        &self,
+        model: &str,
+        name: &str,
+        url: &str,
+        language: &str,
+    ) -> Result<CosyVoiceRecord> {
         let prefix = sanitize_prefix(name);
         tracing::info!(
-            "CosyVoice 创建音色(URL): model={} prefix={} name={}",
+            "CosyVoice 创建音色(URL): model={} prefix={} name={} lang={}",
             model,
             prefix,
-            name
+            name,
+            language
         );
-        let voice_id = create_voice(&self.api_key, model, &prefix, url, Some(&["zh"])).await?;
+        let voice_id = create_voice(
+            &self.api_key,
+            model,
+            &prefix,
+            url,
+            Some(&[language]),
+        )
+        .await?;
         poll_until_ready(
             &mut |voice_id: String| async move {
                 let status = query_voice(&self.api_key, &voice_id).await?;

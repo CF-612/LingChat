@@ -107,6 +107,7 @@ pub async fn cosyvoice_create_voice(
     name: String,
     model: String,
     file_path: String,
+    language: String,
     channel: tauri::ipc::Channel<CosyvoiceProgress>,
 ) -> Result<CosyVoiceRecord, String> {
     // 上传大小限制 20MB（与参考实现一致）
@@ -119,9 +120,10 @@ pub async fn cosyvoice_create_voice(
             meta.len() as f64 / (1024.0 * 1024.0)
         ));
     }
+    let language = if language.trim().is_empty() { "zh" } else { language.trim() };
     let svc = service(&app).map_err(|e| e.to_string())?;
     let record = svc
-        .create_from_file(&model, &name, &path, &|phase: &str| {
+        .create_from_file(&model, &name, &path, language, &|phase: &str| {
             let _ = channel.send(CosyvoiceProgress {
                 phase: phase.to_string(),
             });
@@ -141,10 +143,12 @@ pub async fn cosyvoice_create_voice_from_url(
     name: String,
     model: String,
     url: String,
+    language: String,
 ) -> Result<CosyVoiceRecord, String> {
+    let language = if language.trim().is_empty() { "zh" } else { language.trim() };
     let svc = service(&app).map_err(|e| e.to_string())?;
     let record = svc
-        .create_from_url(&model, &name, &url)
+        .create_from_url(&model, &name, &url, language)
         .await
         .map_err(|e| e.to_string())?;
     let mut records = read_voice_records(&app);

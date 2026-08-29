@@ -481,6 +481,23 @@
               :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
               :disabled="!cosyKeyConfigured || cosyRegistering"
             />
+            <label class="flex flex-col gap-1.5 text-xs text-white/60">
+              <span>{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
+              <select
+                v-model="cosyLang"
+                class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                :disabled="!cosyKeyConfigured || cosyRegistering"
+              >
+                <option
+                  v-for="lang in COSYVOICE_LANGUAGES"
+                  :key="lang"
+                  :value="lang"
+                  class="bg-slate-800"
+                >
+                  {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
+                </option>
+              </select>
+            </label>
             <button
               v-if="!cosyUrlMode"
               class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -650,12 +667,15 @@ const cosySelectedModel = ref('')
 const cosyNewModel = ref('')
 const cosyVoices = ref<TtsCosyvoice.CosyVoiceView[]>([])
 const cosyVoiceName = ref('')
+const cosyLang = ref('zh')
 const cosySamplePath = ref('')
 const cosyRegistering = ref(false)
 const cosyUrlMode = ref(false)
 const cosyUrl = ref('')
 const cosyPreviewVoice = ref('')
 const cosyPreviewing = ref(false)
+// 样本语种(cosyvoice-v3.5-flash 的 language_hints 官方支持范围)
+const COSYVOICE_LANGUAGES = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'ru', 'pt', 'th', 'id', 'vi'] as const
 // 推理设备（本地 TTS 热切换）：仅 Windows 显示 GPU 选项
 const inferenceDevice = ref('cpu')
 const savingDevice = ref(false)
@@ -1113,6 +1133,7 @@ async function registerCosyVoice(): Promise<void> {
       name,
       cosySelectedModel.value,
       cosySamplePath.value,
+      cosyLang.value,
       (phase) => {
         notice.value = { kind: 'success', text: phase }
       },
@@ -1144,7 +1165,12 @@ async function registerCosyVoiceFromUrl(): Promise<void> {
   cosyRegistering.value = true
   notice.value = null
   try {
-    const record = await TtsCosyvoice.createVoiceFromUrl(name, cosySelectedModel.value, url)
+    const record = await TtsCosyvoice.createVoiceFromUrl(
+      name,
+      cosySelectedModel.value,
+      url,
+      cosyLang.value,
+    )
     notice.value = { kind: 'success', text: `音色注册成功: ${record.name}` }
     cosyVoiceName.value = ''
     cosyUrl.value = ''
