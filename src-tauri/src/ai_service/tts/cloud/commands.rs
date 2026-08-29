@@ -211,6 +211,12 @@ pub async fn cosyvoice_synthesize_preview(
     voice_id: String,
     text: String,
 ) -> Result<Vec<u8>, String> {
+    tracing::info!(
+        "CosyVoice 试听请求: model={} voice={} text_len={}",
+        model,
+        voice_id,
+        text.chars().count()
+    );
     let svc = service(&app).map_err(|e| e.to_string())?;
 
     // 自愈：本地缓存非 ok → 实时查一次云端；本地没有该音色 → 拒绝（参考实现 404 语义）
@@ -220,10 +226,15 @@ pub async fn cosyvoice_synthesize_preview(
         .find(|r| r.voice_id == voice_id)
         .ok_or_else(|| format!("音色不在本地列表中: {voice_id}"))?;
     if needs_live_status_check(cached.status.as_deref()) {
+        tracing::info!(
+            "CosyVoice 试听自愈: 缓存状态={:?}，实时查询云端",
+            cached.status
+        );
         let live = svc
             .status(&voice_id)
             .await
             .map_err(|e| format!("查询音色状态失败: {e}"))?;
+        tracing::info!("CosyVoice 试听自愈结果: {live}");
         let mut records = read_voice_records(&app);
         if let Some(r) = records.iter_mut().find(|r| r.voice_id == voice_id) {
             r.status = Some(live.clone());
@@ -232,6 +243,8 @@ pub async fn cosyvoice_synthesize_preview(
         if live != "ok" {
             return Err(format!("音色尚未可用（status={live}），无法合成"));
         }
+    } else {
+        tracing::debug!("CosyVoice 试听: 缓存状态 ok，直接合成");
     }
 
     // 复用 adapter 的合成逻辑（与对话链路同构）
@@ -241,10 +254,12 @@ pub async fn cosyvoice_synthesize_preview(
             model,
             voice_id,
         );
-    adapter
-        .generate_voice(&text, "")
-        .await
-        .map_err(|e| e.to_string())
+    let result = adapter.generate_voice(&text, "").await;
+    match &result {
+        Ok(bytes) => tracing::info!("CosyVoice 试听合成成功: {} bytes", bytes.len()),
+        Err(e) => tracing::warn!("CosyVoice 试听合成失败: {e}"),
+    }
+    result.map_err(|e| e.to_string())
 }
 
 /// 新增或更新一条音色记录（按 voice_id 去重）。

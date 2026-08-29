@@ -81,6 +81,7 @@ impl TtsAdapter for CosyvoiceAdapter {
         let audio_url = body["output"]["audio"]["url"]
             .as_str()
             .ok_or_else(|| anyhow!("CosyVoice 响应缺少 output.audio.url: {body}"))?;
+        let started = std::time::Instant::now();
         let bytes = http_client()
             .get(audio_url)
             .send()
@@ -88,7 +89,11 @@ impl TtsAdapter for CosyvoiceAdapter {
             .bytes()
             .await?
             .to_vec();
-        tracing::debug!("CosyVoice 合成完成: {} bytes", bytes.len());
+        tracing::debug!(
+            "CosyVoice 合成完成: {} bytes, 耗时 {:.1}s",
+            bytes.len(),
+            started.elapsed().as_secs_f64()
+        );
         Ok(bytes)
     }
 

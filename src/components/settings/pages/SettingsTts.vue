@@ -1316,6 +1316,11 @@ async function runCosyPreview(): Promise<void> {
     notice.value = { kind: 'error', text: '请输入试听文本' }
     return
   }
+  console.log('[cosyvoice] 试听开始', {
+    model: cosySelectedModel.value,
+    voiceId: cosyPreviewVoice.value,
+    textLen: previewText.value.trim().length,
+  })
   cosyPreviewing.value = true
   notice.value = null
   try {
@@ -1324,14 +1329,22 @@ async function runCosyPreview(): Promise<void> {
       cosyPreviewVoice.value,
       previewText.value.trim(),
     )
+    console.log('[cosyvoice] 合成返回', bytes.byteLength, 'bytes')
     if (audioUrl) URL.revokeObjectURL(audioUrl)
     audioUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
     await nextTick()
     if (audioRef.value) {
       audioRef.value.src = audioUrl
-      await audioRef.value.play()
+      try {
+        await audioRef.value.play()
+        console.log('[cosyvoice] 播放中', audioUrl)
+      } catch (playErr) {
+        console.error('[cosyvoice] 播放失败', playErr)
+        throw playErr
+      }
     }
   } catch (e) {
+    console.error('[cosyvoice] 试听失败', e)
     notice.value = { kind: 'error', text: `试听失败: ${errorText(e)}` }
   } finally {
     cosyPreviewing.value = false
