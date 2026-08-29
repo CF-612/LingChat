@@ -173,27 +173,18 @@ pub async fn cosyvoice_voice_status(
 
 #[tauri::command]
 pub async fn cosyvoice_list_voices(app: AppHandle) -> Result<Vec<CosyVoiceView>, String> {
-    let svc = match service(&app) {
-        Ok(s) => s,
-        // 未配置 Key：返回空列表，由前端提示
-        Err(_) => return Ok(Vec::new()),
-    };
-    let cloud = svc.list().await.unwrap_or_default();
+    // 本地记录为权威列表（参考已验证实现）：注册时 add、删除时 remove、轮询更新状态，
+    // 不依赖云端 list_voice 接口
     let records = read_voice_records(&app);
-    // 云端为权威列表；状态/名称/模型来自本地缓存（由轮询与自愈更新）
-    let mut views = Vec::new();
-    for voice_id in cloud {
-        let record = records.iter().find(|r| r.voice_id == voice_id);
-        views.push(CosyVoiceView {
-            voice_id: voice_id.clone(),
-            name: record
-                .map(|r| r.name.clone())
-                .unwrap_or_else(|| voice_id.clone()),
-            model: record.map(|r| r.model.clone()).unwrap_or_default(),
-            status: record.and_then(|r| r.status.clone()),
-        });
-    }
-    Ok(views)
+    Ok(records
+        .iter()
+        .map(|r| CosyVoiceView {
+            voice_id: r.voice_id.clone(),
+            name: r.name.clone(),
+            model: r.model.clone(),
+            status: r.status.clone(),
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -222,23 +213,24 @@ pub async fn cosyvoice_synthesize_preview(
 ) -> Result<Vec<u8>, String> {
     let svc = service(&app).map_err(|e| e.to_string())?;
 
-    // 自愈：从缓存找该音色；缓存非 ok → 实时查一次
+    // 自愈：本地缓存非 ok → 实时查一次云端；本地没有该音色 → 拒绝（参考实现 404 语义）
     let records = read_voice_records(&app);
-    let cached = records.iter().find(|r| r.voice_id == voice_id);
-    if let Some(record) = cached {
-        if needs_live_status_check(record.status.as_deref()) {
-            let live = svc
-                .status(&voice_id)
-                .await
-                .map_err(|e| format!("查询音色状态失败: {e}"))?;
-            let mut records = read_voice_records(&app);
-            if let Some(r) = records.iter_mut().find(|r| r.voice_id == voice_id) {
-                r.status = Some(live.clone());
-                write_voice_records(&app, records).map_err(|e| e.to_string())?;
-            }
-            if live != "ok" {
-                return Err(format!("音色尚未可用（status={live}），无法合成"));
-            }
+    let cached = records
+        .iter()
+        .find(|r| r.voice_id == voice_id)
+        .ok_or_else(|| format!("音色不在本地列表中: {voice_id}"))?;
+    if needs_live_status_check(cached.status.as_deref()) {
+        let live = svc
+            .status(&voice_id)
+            .await
+            .map_err(|e| format!("查询音色状态失败: {e}"))?;
+        let mut records = read_voice_records(&app);
+        if let Some(r) = records.iter_mut().find(|r| r.voice_id == voice_id) {
+            r.status = Some(live.clone());
+            write_voice_records(&app, records).map_err(|e| e.to_string())?;
+        }
+        if live != "ok" {
+            return Err(format!("音色尚未可用（status={live}），无法合成"));
         }
     }
 

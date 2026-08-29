@@ -43,20 +43,8 @@ pub fn parse_voice_id(resp: &Value) -> Result<String> {
 pub fn parse_voice_status(resp: &Value) -> Result<String> {
     resp["output"]["status"]
         .as_str()
-        .map(str::to_string)
+        .map(|s| s.to_lowercase())
         .ok_or_else(|| anyhow!("query_voice 响应缺少 status: {resp}"))
-}
-
-/// 从 list_voice 响应提取 voice_id 列表。
-pub fn parse_voice_list(resp: &Value) -> Result<Vec<String>> {
-    resp["output"]["voice_list"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|item| item["voice_id"].as_str().map(str::to_string))
-                .collect()
-        })
-        .ok_or_else(|| anyhow!("list_voice 响应缺少 voice_list: {resp}"))
 }
 
 async fn post_customization(api_key: &str, body: Value) -> Result<Value> {
@@ -70,8 +58,11 @@ async fn post_customization(api_key: &str, body: Value) -> Result<Value> {
         .await?;
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("CosyVoice 请求失败: HTTP {status}: {text}"));
+        let body: Value = resp.json().await.unwrap_or_default();
+        let body_str = body.to_string();
+        let code = body["code"].as_str().unwrap_or("HTTP_ERROR");
+        let message = body["message"].as_str().unwrap_or(&body_str);
+        return Err(anyhow!("CosyVoice 请求失败: {code}: {message} (HTTP {status})"));
     }
     Ok(resp.json().await?)
 }
@@ -98,19 +89,6 @@ pub async fn query_voice(api_key: &str, voice_id: &str) -> Result<String> {
     )
     .await?;
     parse_voice_status(&resp)
-}
-
-pub async fn list_voices(api_key: &str, prefix: Option<&str>) -> Result<Vec<String>> {
-    let mut input = json!({"action": "list_voice", "page_size": 100});
-    if let Some(p) = prefix.filter(|p| !p.trim().is_empty()) {
-        input["prefix"] = json!(p);
-    }
-    let resp = post_customization(
-        api_key,
-        json!({"model": "voice-enrollment", "input": input}),
-    )
-    .await?;
-    parse_voice_list(&resp)
 }
 
 pub async fn delete_voice(api_key: &str, voice_id: &str) -> Result<()> {

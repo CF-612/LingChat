@@ -132,11 +132,6 @@ impl CloudVoiceService {
         Ok(status.to_lowercase())
     }
 
-    /// 云端音色 voice_id 列表（不带状态——状态存本地缓存，由轮询更新）。
-    pub async fn list(&self) -> Result<Vec<String>> {
-        list_voices(&self.api_key, None).await
-    }
-
     pub async fn delete(&self, voice_id: &str) -> Result<()> {
         delete_voice(&self.api_key, voice_id).await
     }

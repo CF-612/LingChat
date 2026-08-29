@@ -83,10 +83,12 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
 
     let form = reqwest::multipart::Form::new()
         .text("OSSAccessKeyId", policy.oss_access_key_id.clone())
-        .text("signature", policy.signature.clone())
+        // 注意：OSS POST 直传字段名——Signature 首字母大写、x-oss-* 用连字符
+        // （与已验证实现一致；写错字段名 OSS 会直接 400）
+        .text("Signature", policy.signature.clone())
         .text("policy", policy.policy.clone())
-        .text("x_oss_object_acl", policy.x_oss_object_acl.clone())
-        .text("x_oss_forbid_overwrite", policy.x_oss_forbid_overwrite.clone())
+        .text("x-oss-object-acl", policy.x_oss_object_acl.clone())
+        .text("x-oss-forbid-overwrite", policy.x_oss_forbid_overwrite.clone())
         .text("key", key.clone())
         .text("success_action_status", "200")
         .part(

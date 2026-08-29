@@ -1,8 +1,6 @@
 use serde_json::json;
 
-use crate::ai_service::tts::cloud::enrollment::{
-    create_voice_body, parse_voice_id, parse_voice_list, parse_voice_status,
-};
+use crate::ai_service::tts::cloud::enrollment::{create_voice_body, parse_voice_id, parse_voice_status};
 
 #[test]
 fn create_voice_body_shape() {
@@ -43,13 +41,11 @@ fn parse_voice_id_missing() {
 
 #[test]
 fn parse_voice_status_ok() {
+    // 状态统一归一化为小写（前端/本地缓存均用小写比较）
     let v = json!({"output": {"status": "OK"}});
-    assert_eq!(parse_voice_status(&v).unwrap(), "OK");
-}
-
-#[test]
-fn parse_voice_list_response() {
-    let v = json!({"output": {"voice_list": [{"voice_id": "a"}, {"voice_id": "b"}]}});
-    let ids = parse_voice_list(&v).unwrap();
-    assert_eq!(ids, vec!["a".to_string(), "b".to_string()]);
+    assert_eq!(parse_voice_status(&v).unwrap(), "ok");
+    let v = json!({"output": {"status": "UNDEPLOYED"}});
+    assert_eq!(parse_voice_status(&v).unwrap(), "undeployed");
+    let v = json!({"output": {"status": "DEPLOYING"}});
+    assert_eq!(parse_voice_status(&v).unwrap(), "deploying");
 }

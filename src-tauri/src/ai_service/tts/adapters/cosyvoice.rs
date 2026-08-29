@@ -1,7 +1,8 @@
-//! CosyVoice 云端语音合成适配器（HTTP 非流式）。
+//! CosyVoice 云端语音合成适配器。
 //!
-//! 官方端点：`POST /api/v1/services/audio/tts/SpeechSynthesizer`，
-//! 请求 `{model, input: {text, voice, format, sample_rate}}`，非流式直接返回音频字节。
+//! 官方端点：`POST /api/v1/services/audio/tts/SpeechSynthesizer`。
+//! 注意：非流式响应是 **JSON**（含 `output.audio.url` 与 `finish_reason`），
+//! 不是直接音频字节——需校验 finish_reason 后提取 url 再 GET 下载（参考已验证实现）。
 
 use std::collections::HashMap;
 
@@ -51,6 +52,9 @@ impl TtsAdapter for CosyvoiceAdapter {
                 "voice": self.voice_id,
                 "format": "wav",
                 "sample_rate": 24000,
+                "volume": 50,
+                "rate": 1.0,
+                "pitch": 1.0,
             }
         });
         let resp = http_client()
@@ -61,10 +65,31 @@ impl TtsAdapter for CosyvoiceAdapter {
             .await?;
         if !resp.status().is_success() {
             let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            return Err(anyhow!("CosyVoice 合成失败: HTTP {status}: {text}"));
+            let body: JsonValue = resp.json().await.unwrap_or_default();
+            let body_str = body.to_string();
+            let code = body["code"].as_str().unwrap_or("HTTP_ERROR");
+            let message = body["message"].as_str().unwrap_or(&body_str);
+            return Err(anyhow!("CosyVoice 合成失败: {code}: {message} (HTTP {status})"));
         }
-        Ok(resp.bytes().await?.to_vec())
+        let body: JsonValue = resp.json().await?;
+        // finish_reason 非 stop 说明合成未完成（截断/错误）
+        if let Some(f) = body["output"]["finish_reason"].as_str() {
+            if f != "stop" {
+                return Err(anyhow!("CosyVoice 合成未完成: finish_reason={f}"));
+            }
+        }
+        let audio_url = body["output"]["audio"]["url"]
+            .as_str()
+            .ok_or_else(|| anyhow!("CosyVoice 响应缺少 output.audio.url: {body}"))?;
+        let bytes = http_client()
+            .get(audio_url)
+            .send()
+            .await?
+            .bytes()
+            .await?
+            .to_vec();
+        tracing::debug!("CosyVoice 合成完成: {} bytes", bytes.len());
+        Ok(bytes)
     }
 
     fn get_params(&self) -> HashMap<String, JsonValue> {
