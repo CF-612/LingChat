@@ -79,6 +79,7 @@ pub struct TtsConfig {
 }
 
 /// CosyVoice 音色本地映射（voice_id 为云端生成；name 为用户命名，用于展示）。
+/// status 为审核状态缓存：注册时写入 "deploying"，轮询/自愈时更新为 "ok"/"undeployed"。
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CosyVoiceRecord {
     pub voice_id: String,
@@ -86,6 +87,8 @@ pub struct CosyVoiceRecord {
     pub model: String,
     #[serde(default)]
     pub created_at: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
 }
 
 // ---- 默认值（单一真相源：serde + Default + from_store 均引用这些函数） ----

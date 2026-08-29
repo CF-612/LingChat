@@ -123,17 +123,14 @@ pub async fn cosyvoice_create_voice(
     let language = if language.trim().is_empty() { "zh" } else { language.trim() };
     let svc = service(&app).map_err(|e| e.to_string())?;
     let record = svc
-        .create_from_file(&model, &name, &path, language, &|phase: &str| {
+        .submit_from_file(&model, &name, &path, language, &|phase: &str| {
             let _ = channel.send(CosyvoiceProgress {
                 phase: phase.to_string(),
             });
         })
         .await
         .map_err(|e| e.to_string())?;
-    let mut records = read_voice_records(&app);
-    records.retain(|r| r.voice_id != record.voice_id);
-    records.push(record.clone());
-    write_voice_records(&app, records).map_err(|e| e.to_string())?;
+    upsert_voice_record(&app, &record).map_err(|e| e.to_string())?;
     Ok(record)
 }
 
@@ -148,14 +145,30 @@ pub async fn cosyvoice_create_voice_from_url(
     let language = if language.trim().is_empty() { "zh" } else { language.trim() };
     let svc = service(&app).map_err(|e| e.to_string())?;
     let record = svc
-        .create_from_url(&model, &name, &url, language)
+        .submit_from_url(&model, &name, &url, language)
         .await
         .map_err(|e| e.to_string())?;
-    let mut records = read_voice_records(&app);
-    records.retain(|r| r.voice_id != record.voice_id);
-    records.push(record.clone());
-    write_voice_records(&app, records).map_err(|e| e.to_string())?;
+    upsert_voice_record(&app, &record).map_err(|e| e.to_string())?;
     Ok(record)
+}
+
+/// 查询单音色审核状态（小写），结果写回本地缓存；未注册过该音色也照常查询。
+#[tauri::command]
+pub async fn cosyvoice_voice_status(
+    app: AppHandle,
+    voice_id: String,
+) -> Result<String, String> {
+    let svc = service(&app).map_err(|e| e.to_string())?;
+    let status = svc.status(&voice_id).await.map_err(|e| e.to_string())?;
+    let mut records = read_voice_records(&app);
+    if let Some(record) = records.iter_mut().find(|r| r.voice_id == voice_id) {
+        if record.status.as_deref() != Some(status.as_str()) {
+            tracing::info!("CosyVoice 音色状态更新: {voice_id} -> {status}");
+        }
+        record.status = Some(status.clone());
+        write_voice_records(&app, records).map_err(|e| e.to_string())?;
+    }
+    Ok(status)
 }
 
 #[tauri::command]
@@ -167,16 +180,17 @@ pub async fn cosyvoice_list_voices(app: AppHandle) -> Result<Vec<CosyVoiceView>,
     };
     let cloud = svc.list().await.unwrap_or_default();
     let records = read_voice_records(&app);
+    // 云端为权威列表；状态/名称/模型来自本地缓存（由轮询与自愈更新）
     let mut views = Vec::new();
-    for item in cloud {
-        let record = records.iter().find(|r| r.voice_id == item.voice_id);
+    for voice_id in cloud {
+        let record = records.iter().find(|r| r.voice_id == voice_id);
         views.push(CosyVoiceView {
-            voice_id: item.voice_id.clone(),
+            voice_id: voice_id.clone(),
             name: record
                 .map(|r| r.name.clone())
-                .unwrap_or_else(|| item.voice_id.clone()),
+                .unwrap_or_else(|| voice_id.clone()),
             model: record.map(|r| r.model.clone()).unwrap_or_default(),
-            status: item.status,
+            status: record.and_then(|r| r.status.clone()),
         });
     }
     Ok(views)
@@ -193,6 +207,12 @@ pub async fn cosyvoice_delete_voice(app: AppHandle, voice_id: String) -> Result<
     write_voice_records(&app, records).map_err(|e| e.to_string())
 }
 
+/// 试听前自愈检查：缓存状态非 "ok" 时实时查一次云端，通过才放行。
+/// 防止「页面关着时审核已通过，缓存仍是 deploying」导致误拒。
+fn needs_live_status_check(status: Option<&str>) -> bool {
+    !matches!(status, Some("ok"))
+}
+
 #[tauri::command]
 pub async fn cosyvoice_synthesize_preview(
     app: AppHandle,
@@ -201,6 +221,27 @@ pub async fn cosyvoice_synthesize_preview(
     text: String,
 ) -> Result<Vec<u8>, String> {
     let svc = service(&app).map_err(|e| e.to_string())?;
+
+    // 自愈：从缓存找该音色；缓存非 ok → 实时查一次
+    let records = read_voice_records(&app);
+    let cached = records.iter().find(|r| r.voice_id == voice_id);
+    if let Some(record) = cached {
+        if needs_live_status_check(record.status.as_deref()) {
+            let live = svc
+                .status(&voice_id)
+                .await
+                .map_err(|e| format!("查询音色状态失败: {e}"))?;
+            let mut records = read_voice_records(&app);
+            if let Some(r) = records.iter_mut().find(|r| r.voice_id == voice_id) {
+                r.status = Some(live.clone());
+                write_voice_records(&app, records).map_err(|e| e.to_string())?;
+            }
+            if live != "ok" {
+                return Err(format!("音色尚未可用（status={live}），无法合成"));
+            }
+        }
+    }
+
     // 复用 adapter 的合成逻辑（与对话链路同构）
     let adapter =
         crate::ai_service::tts::adapters::cosyvoice::CosyvoiceAdapter::new(
@@ -212,4 +253,12 @@ pub async fn cosyvoice_synthesize_preview(
         .generate_voice(&text, "")
         .await
         .map_err(|e| e.to_string())
+}
+
+/// 新增或更新一条音色记录（按 voice_id 去重）。
+fn upsert_voice_record(app: &AppHandle, record: &CosyVoiceRecord) -> Result<()> {
+    let mut records = read_voice_records(app);
+    records.retain(|r| r.voice_id != record.voice_id);
+    records.push(record.clone());
+    write_voice_records(app, records)
 }

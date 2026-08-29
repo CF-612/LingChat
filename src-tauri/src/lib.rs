@@ -850,6 +850,7 @@ pub fn run() {
             ai_service::tts::cloud::commands::cosyvoice_remove_model,
             ai_service::tts::cloud::commands::cosyvoice_create_voice,
             ai_service::tts::cloud::commands::cosyvoice_create_voice_from_url,
+            ai_service::tts::cloud::commands::cosyvoice_voice_status,
             ai_service::tts::cloud::commands::cosyvoice_list_voices,
             ai_service::tts::cloud::commands::cosyvoice_delete_voice,
             ai_service::tts::cloud::commands::cosyvoice_synthesize_preview,

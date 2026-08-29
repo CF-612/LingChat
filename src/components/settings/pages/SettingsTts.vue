@@ -446,8 +446,15 @@
                   <p class="mt-1 truncate text-xs text-white/45">
                     {{ voice.voice_id }} · {{ voice.model }}
                   </p>
-                  <p v-if="voice.status && voice.status !== 'OK'" class="mt-1 text-[11px] text-amber-300">
-                    {{ t('settings.tts.cosyvoice.voiceStatus', { status: voice.status }) }}
+                  <p class="mt-1 flex items-center gap-2 text-[11px]">
+                    <span :class="statusClass(voice.status)">{{ statusLabel(voice.status) }}</span>
+                    <button
+                      v-if="statusPaused.has(voice.voice_id)"
+                      class="rounded border border-white/15 bg-white/5 px-1.5 py-px text-[10px] text-white/70 transition-colors hover:border-cyan-300/40 hover:text-cyan-50"
+                      @click="retryVoiceStatus(voice.voice_id)"
+                    >
+                      {{ t('settings.tts.cosyvoice.retryStatus') }}
+                    </button>
                   </p>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
@@ -676,6 +683,87 @@ const cosyPreviewVoice = ref('')
 const cosyPreviewing = ref(false)
 // 样本语种(cosyvoice-v3.5-flash 的 language_hints 官方支持范围)
 const COSYVOICE_LANGUAGES = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'ru', 'pt', 'th', 'id', 'vi'] as const
+// 审核状态轮询(参考 N.E.K.O.:5s 周期 + 在途/暂停去重 + 失败暂停手动重查)
+const statusPolling = new Set<string>()
+const statusPaused = new Set<string>()
+let statusTimer: ReturnType<typeof setInterval> | null = null
+
+// 终态(不再轮询)
+function isTerminalStatus(status: string | null | undefined): boolean {
+  const s = status?.toLowerCase()
+  return s === 'ok' || s === 'undeployed'
+}
+
+// 状态徽标样式
+function statusClass(status: string | null | undefined): string {
+  switch (status?.toLowerCase()) {
+    case 'ok':
+      return 'text-emerald-300'
+    case 'undeployed':
+      return 'text-red-300'
+    case 'deploying':
+      return 'text-amber-300'
+    default:
+      return 'text-white/40'
+  }
+}
+
+function statusLabel(status: string | null | undefined): string {
+  switch (status?.toLowerCase()) {
+    case 'ok':
+      return t('settings.tts.cosyvoice.statusOk')
+    case 'undeployed':
+      return t('settings.tts.cosyvoice.statusUndeployed')
+    case 'deploying':
+      return t('settings.tts.cosyvoice.statusDeploying')
+    default:
+      return t('settings.tts.cosyvoice.statusUnknown')
+  }
+}
+
+// 查单个音色状态:终态刷新列表;失败加入暂停集(显示"状态未知"+手动重查)
+async function pollVoiceStatus(voiceId: string): Promise<void> {
+  statusPolling.add(voiceId)
+  try {
+    const status = await TtsCosyvoice.voiceStatus(voiceId)
+    if (isTerminalStatus(status)) {
+      await loadCosyvoice()
+    }
+    // 非终态:不刷新,下个 5s 周期自动重新加入再查
+  } catch {
+    statusPaused.add(voiceId)
+    await loadCosyvoice()
+  } finally {
+    statusPolling.delete(voiceId)
+  }
+}
+
+// 每周期找出需要查的音色:非终态 + 不在途 + 未暂停
+function startStatusPolling(): void {
+  for (const voice of cosyVoices.value) {
+    if (
+      isTerminalStatus(voice.status) ||
+      statusPolling.has(voice.voice_id) ||
+      statusPaused.has(voice.voice_id)
+    ) {
+      continue
+    }
+    void pollVoiceStatus(voice.voice_id)
+  }
+}
+
+// 手动重查:解除暂停并立即查一次
+async function retryVoiceStatus(voiceId: string): Promise<void> {
+  statusPaused.delete(voiceId)
+  await pollVoiceStatus(voiceId)
+}
+
+function stopStatusPolling(): void {
+  if (statusTimer) {
+    clearInterval(statusTimer)
+    statusTimer = null
+  }
+}
 // 推理设备（本地 TTS 热切换）：仅 Windows 显示 GPU 选项
 const inferenceDevice = ref('cpu')
 const savingDevice = ref(false)
@@ -1015,6 +1103,9 @@ onMounted(async () => {
   await loadLocalTtsSwitch()
   await refreshAll()
   await loadCosyvoice()
+  // 审核状态轮询(每 5s;终态自动停止,失败自动暂停)
+  statusTimer = setInterval(startStatusPolling, 5000)
+  startStatusPolling()
 
   // 加载 GPU 设备列表（Windows 用 DXGI，Linux 用 Vulkan 枚举特定显卡）
   if (isWindows || isLinux) {
@@ -1044,6 +1135,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   componentMounted = false
+  stopStatusPolling()
   if (audioUrl) URL.revokeObjectURL(audioUrl)
   unlistenProgress?.()
   unlistenProgress = null
@@ -1140,11 +1232,12 @@ async function registerCosyVoice(): Promise<void> {
     )
     notice.value = {
       kind: 'success',
-      text: `音色注册成功: ${record.name} (${record.voice_id})`,
+      text: `音色已提交审核: ${record.name}（${record.voice_id}），审核通过后即可使用`,
     }
     cosyVoiceName.value = ''
     cosySamplePath.value = ''
     await loadCosyvoice()
+    startStatusPolling()
   } catch (e) {
     notice.value = {
       kind: 'error',
@@ -1171,10 +1264,14 @@ async function registerCosyVoiceFromUrl(): Promise<void> {
       url,
       cosyLang.value,
     )
-    notice.value = { kind: 'success', text: `音色注册成功: ${record.name}` }
+    notice.value = {
+      kind: 'success',
+      text: `音色已提交审核: ${record.name}，审核通过后即可使用`,
+    }
     cosyVoiceName.value = ''
     cosyUrl.value = ''
     await loadCosyvoice()
+    startStatusPolling()
   } catch (e) {
     notice.value = { kind: 'error', text: `音色注册失败: ${errorText(e)}` }
   } finally {

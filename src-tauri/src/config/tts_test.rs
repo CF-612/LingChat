@@ -23,6 +23,7 @@ fn cosyvoice_config_serde_roundtrip() {
         name: "诺一".into(),
         model: "cosyvoice-v3.5-flash".into(),
         created_at: Some("2026-08-29".into()),
+        status: Some("ok".into()),
     }];
     let json = serde_json::to_string(&cfg).unwrap();
     let back: TtsConfig = serde_json::from_str(&json).unwrap();

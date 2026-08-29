@@ -70,6 +70,11 @@ export function listVoices(): Promise<CosyVoiceView[]> {
   return invoke<CosyVoiceView[]>('cosyvoice_list_voices')
 }
 
+/** 查询单音色审核状态（小写 ok/undeployed/deploying…），后端会写回本地缓存 */
+export function voiceStatus(voiceId: string): Promise<string> {
+  return invoke<string>('cosyvoice_voice_status', { voiceId })
+}
+
 export function deleteVoice(voiceId: string): Promise<void> {
   return invoke<void>('cosyvoice_delete_voice', { voiceId })
 }
