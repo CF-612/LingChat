@@ -455,7 +455,7 @@
                     class="inline-flex h-[34px] w-[34px] items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
                     :title="t('settings.tts.cosyvoice.previewVoice')"
                     :disabled="cosyRegistering"
-                    @click="cosyPreviewVoice = voice.voice_id; runCosyPreview()"
+                    @click="previewVoiceFrom(voice)"
                   >
                     <Play :size="16" />
                   </button>
@@ -1196,8 +1196,29 @@ async function removeCosyVoice(voice: TtsCosyvoice.CosyVoiceView): Promise<void>
   }
 }
 
+// 音色卡片的试听:用音色自己所属的模型合成(合成模型必须与注册模型一致,否则云端报错)
+async function previewVoiceFrom(voice: TtsCosyvoice.CosyVoiceView): Promise<void> {
+  if (voice.model && cosyModels.value.includes(voice.model)) {
+    cosySelectedModel.value = voice.model
+  }
+  cosyPreviewVoice.value = voice.voice_id
+  await runCosyPreview()
+}
+
+// 试听区音色下拉:选中音色后自动同步其所属模型,避免不匹配组合
+watch(cosyPreviewVoice, (voiceId) => {
+  const voice = cosyVoices.value.find((v) => v.voice_id === voiceId)
+  if (voice?.model && cosyModels.value.includes(voice.model)) {
+    cosySelectedModel.value = voice.model
+  }
+})
+
 async function runCosyPreview(): Promise<void> {
   if (!cosySelectedModel.value || !cosyPreviewVoice.value) return
+  if (!previewText.value.trim()) {
+    notice.value = { kind: 'error', text: '请输入试听文本' }
+    return
+  }
   cosyPreviewing.value = true
   notice.value = null
   try {
