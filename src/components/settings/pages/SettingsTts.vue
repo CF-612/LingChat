@@ -347,6 +347,231 @@
             <audio ref="audioRef" controls class="h-9 min-w-0 flex-1" />
           </div>
         </section>
+
+        <!-- 云端语音克隆 TTS（CosyVoice） -->
+        <section class="border-t border-white/10 pt-6">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">{{ t('settings.tts.cosyvoice.title') }}</h3>
+              <p class="mt-0.5 text-xs text-white/45">{{ t('settings.tts.cosyvoice.subtitle') }}</p>
+            </div>
+            <Mic2 :size="18" class="text-white/40" />
+          </div>
+
+          <!-- API Key -->
+          <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+            <KeyRound :size="16" class="shrink-0 text-white/40" />
+            <input
+              v-model="cosyKey"
+              type="password"
+              class="w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-80"
+              :placeholder="cosyKeyConfigured
+                ? t('settings.tts.cosyvoice.keyConfigured')
+                : t('settings.tts.cosyvoice.keyPlaceholder')"
+              :disabled="cosyKeyConfigured"
+            />
+            <button
+              v-if="cosyKeyConfigured"
+              class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50"
+              @click="cosyKeyConfigured = false"
+            >
+              <KeyRound :size="16" />
+              {{ t('settings.tts.cosyvoice.keyChange') }}
+            </button>
+            <button
+              v-else
+              class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!cosyKey.trim()"
+              @click="saveCosyKey"
+            >
+              {{ t('settings.tts.cosyvoice.keySave') }}
+            </button>
+          </div>
+
+          <!-- 模型管理 -->
+          <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+            <label class="flex flex-col gap-1.5 text-xs text-white/60">
+              <span>{{ t('settings.tts.cosyvoice.modelLabel') }}</span>
+              <select
+                v-model="cosySelectedModel"
+                class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                :disabled="!cosyKeyConfigured || cosyRegistering"
+              >
+                <option v-for="m in cosyModels" :key="m" :value="m" class="bg-slate-800">{{ m }}</option>
+              </select>
+            </label>
+            <input
+              v-model="cosyNewModel"
+              class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-52"
+              :placeholder="t('settings.tts.cosyvoice.modelAddPlaceholder')"
+              :disabled="!cosyKeyConfigured"
+            />
+            <button
+              class="inline-flex h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!cosyKeyConfigured || !cosyNewModel.trim()"
+              @click="addCosyModel"
+            >
+              <Plus :size="16" />
+              <span>{{ t('settings.tts.cosyvoice.modelAdd') }}</span>
+            </button>
+            <button
+              v-if="cosySelectedModel"
+              class="inline-flex h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-red-400/50! enabled:hover:bg-red-400/10! enabled:hover:text-red-300! disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!cosyKeyConfigured"
+              @click="removeCosyModel(cosySelectedModel)"
+            >
+              <Trash2 :size="16" />
+            </button>
+          </div>
+
+          <!-- 我的音色 -->
+          <div class="mb-4">
+            <p class="mb-2 text-xs text-white/60">
+              {{ t('settings.tts.cosyvoice.voicesLabel', { count: cosyVoices.length }) }}
+            </p>
+            <div
+              v-if="cosyVoices.length === 0"
+              class="border-y border-white/10 py-[22px] text-center text-[13px] text-white/40"
+            >
+              {{ t('settings.tts.cosyvoice.voicesEmpty') }}
+            </div>
+            <div v-else class="divide-y divide-white/8 border-y border-white/10">
+              <div
+                v-for="voice in cosyVoices"
+                :key="voice.voice_id"
+                class="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-3"
+              >
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-medium text-white">{{ voice.name }}</p>
+                  <p class="mt-1 truncate text-xs text-white/45">
+                    {{ voice.voice_id }} · {{ voice.model }}
+                  </p>
+                  <p v-if="voice.status && voice.status !== 'OK'" class="mt-1 text-[11px] text-amber-300">
+                    {{ t('settings.tts.cosyvoice.voiceStatus', { status: voice.status }) }}
+                  </p>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <button
+                    class="inline-flex h-[34px] w-[34px] items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    :title="t('settings.tts.cosyvoice.previewVoice')"
+                    :disabled="cosyRegistering"
+                    @click="cosyPreviewVoice = voice.voice_id; runCosyPreview()"
+                  >
+                    <Play :size="16" />
+                  </button>
+                  <button
+                    class="inline-flex h-[34px] w-[34px] items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 enabled:hover:border-red-400/50! enabled:hover:bg-red-400/10! enabled:hover:text-red-300! disabled:cursor-not-allowed disabled:opacity-40"
+                    :title="t('settings.tts.cosyvoice.deleteVoice')"
+                    :disabled="cosyRegistering"
+                    @click="removeCosyVoice(voice)"
+                  >
+                    <Trash2 :size="16" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 导入样本注册 -->
+          <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+            <input
+              v-model="cosyVoiceName"
+              class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-44"
+              maxlength="32"
+              :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
+              :disabled="!cosyKeyConfigured || cosyRegistering"
+            />
+            <button
+              v-if="!cosyUrlMode"
+              class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!cosyKeyConfigured || cosyRegistering"
+              @click="pickCosySample"
+            >
+              <FileArchive :size="17" />
+              <span>
+                {{ cosySamplePath
+                  ? cosySamplePath.split(/[\\/]/).pop()
+                  : t('settings.tts.cosyvoice.pickSample') }}
+              </span>
+            </button>
+            <input
+              v-if="cosyUrlMode"
+              v-model="cosyUrl"
+              class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+              :placeholder="t('settings.tts.cosyvoice.urlPlaceholder')"
+              :disabled="!cosyKeyConfigured || cosyRegistering"
+            />
+            <button
+              v-if="!cosyUrlMode"
+              class="inline-flex h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!cosyKeyConfigured || cosyRegistering"
+              :title="t('settings.tts.cosyvoice.urlModeTitle')"
+              @click="cosyUrlMode = true"
+            >
+              <Link :size="16" />
+            </button>
+            <button
+              class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="
+                !cosyKeyConfigured ||
+                cosyRegistering ||
+                (cosyUrlMode ? !cosyUrl.trim() : !cosySamplePath)
+              "
+              @click="cosyUrlMode ? registerCosyVoiceFromUrl() : registerCosyVoice()"
+            >
+              <LoaderCircle v-if="cosyRegistering" :size="16" class="animate-spin" />
+              <Mic2 v-else :size="16" />
+              <span>
+                {{ cosyRegistering
+                  ? t('settings.tts.cosyvoice.registering')
+                  : (cosyUrlMode ? t('settings.tts.cosyvoice.registerUrl') : t('settings.tts.cosyvoice.register')) }}
+              </span>
+            </button>
+          </div>
+
+          <!-- 试听 -->
+          <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
+            <textarea
+              v-model="previewText"
+              class="min-h-28 w-full resize-y rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+              maxlength="500"
+              :placeholder="t('settings.tts.cosyvoice.previewPlaceholder')"
+              :disabled="!cosyKeyConfigured"
+            ></textarea>
+            <label class="flex flex-col gap-1.5 text-xs text-white/60">
+              <span>{{ t('settings.tts.cosyvoice.previewVoiceLabel') }}</span>
+              <select
+                v-model="cosyPreviewVoice"
+                class="h-9 w-full rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                :disabled="!cosyKeyConfigured"
+              >
+                <option value="">{{ t('settings.tts.cosyvoice.previewSelect') }}</option>
+                <option
+                  v-for="voice in cosyVoices"
+                  :key="voice.voice_id"
+                  :value="voice.voice_id"
+                  class="bg-slate-800"
+                >
+                  {{ voice.name }}
+                </option>
+              </select>
+            </label>
+          </div>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              class="inline-flex min-h-9 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="!cosyKeyConfigured || !cosyPreviewVoice || cosyPreviewing"
+              @click="runCosyPreview"
+            >
+              <LoaderCircle v-if="cosyPreviewing" :size="16" class="animate-spin" />
+              <Play v-else :size="16" />
+              {{ cosyPreviewing
+                ? t('settings.tts.cosyvoice.generating')
+                : t('settings.tts.cosyvoice.generate') }}
+            </button>
+            <audio ref="audioRef" controls class="h-9 min-w-0 flex-1" />
+          </div>
+        </section>
       </div>
     </MenuItem>
   </MenuPage>
@@ -366,9 +591,13 @@ import {
   FileDown,
   FileJson,
   HardDriveDownload,
+  KeyRound,
+  Link,
   ListMusic,
   LoaderCircle,
+  Mic2,
   Play,
+  Plus,
   RefreshCw,
   Trash2,
   Volume2,
@@ -378,6 +607,7 @@ import { MenuItem, MenuPage } from '@/components/ui'
 import { useDialogStore } from '@/stores/modules/ui/dialog'
 import { useUIStore } from '@/stores/modules/ui/ui'
 import * as TtsLocal from '@/api/services/tts/tts-local'
+import * as TtsCosyvoice from '@/api/services/tts/tts-cosyvoice'
 import { speedToLengthScale } from '@/utils/tts/tts-speed'
 import { catalogRowState } from '@/utils/tts/tts-download-state'
 import type {
@@ -412,6 +642,20 @@ const downloadError = ref<Record<string, string>>({})
 const downloadingId = ref<string | null>(null)
 const localTtsEnabled = ref(false)
 const savingLocalTts = ref(false)
+// CosyVoice 云端语音克隆
+const cosyKey = ref('')
+const cosyKeyConfigured = ref(false)
+const cosyModels = ref<string[]>([])
+const cosySelectedModel = ref('')
+const cosyNewModel = ref('')
+const cosyVoices = ref<TtsCosyvoice.CosyVoiceView[]>([])
+const cosyVoiceName = ref('')
+const cosySamplePath = ref('')
+const cosyRegistering = ref(false)
+const cosyUrlMode = ref(false)
+const cosyUrl = ref('')
+const cosyPreviewVoice = ref('')
+const cosyPreviewing = ref(false)
 // 推理设备（本地 TTS 热切换）：仅 Windows 显示 GPU 选项
 const inferenceDevice = ref('cpu')
 const savingDevice = ref(false)
@@ -521,6 +765,7 @@ async function refreshAll(): Promise<void> {
     if (!previewVoice.value || !nextSnapshot.voices.some((voice) => voice.voice_id === previewVoice.value)) {
       previewVoice.value = nextSnapshot.voices[0]?.voice_id ?? ''
     }
+    await loadCosyvoice()
   } catch (error) {
     notice.value = { kind: 'error', text: `${t('settings.tts.messages.readStatusFailed', { error: errorText(error) })}` }
   } finally {
@@ -749,6 +994,7 @@ onMounted(async () => {
 
   await loadLocalTtsSwitch()
   await refreshAll()
+  await loadCosyvoice()
 
   // 加载 GPU 设备列表（Windows 用 DXGI，Linux 用 Vulkan 枚举特定显卡）
   if (isWindows || isLinux) {
@@ -788,6 +1034,165 @@ onUnmounted(() => {
   unlistenStatusChanged?.()
   unlistenStatusChanged = null
 })
+
+async function loadCosyvoice(): Promise<void> {
+  try {
+    const cfg = await TtsCosyvoice.getConfig()
+    cosyKeyConfigured.value = cfg.api_key_configured
+    cosyModels.value = cfg.models
+    if (!cosySelectedModel.value || !cfg.models.includes(cosySelectedModel.value)) {
+      cosySelectedModel.value = cfg.models[0] ?? ''
+    }
+    const voices = await TtsCosyvoice.listVoices()
+    cosyVoices.value = voices
+    if (
+      !cosyPreviewVoice.value ||
+      !voices.some((v) => v.voice_id === cosyPreviewVoice.value)
+    ) {
+      cosyPreviewVoice.value = voices[0]?.voice_id ?? ''
+    }
+  } catch (e) {
+    notice.value = { kind: 'error', text: `加载语音克隆配置失败: ${errorText(e)}` }
+  }
+}
+
+async function saveCosyKey(): Promise<void> {
+  const key = cosyKey.value.trim()
+  if (!key) return
+  try {
+    await TtsCosyvoice.saveApiKey(key)
+    cosyKey.value = ''
+    cosyKeyConfigured.value = true
+    notice.value = { kind: 'success', text: 'CosyVoice API Key 已保存' }
+    await loadCosyvoice()
+  } catch (e) {
+    notice.value = { kind: 'error', text: `保存 API Key 失败: ${errorText(e)}` }
+  }
+}
+
+async function addCosyModel(): Promise<void> {
+  const model = cosyNewModel.value.trim()
+  if (!model) return
+  try {
+    await TtsCosyvoice.addModel(model)
+    cosyNewModel.value = ''
+    await loadCosyvoice()
+  } catch (e) {
+    notice.value = { kind: 'error', text: `添加模型失败: ${errorText(e)}` }
+  }
+}
+
+async function removeCosyModel(model: string): Promise<void> {
+  try {
+    await TtsCosyvoice.removeModel(model)
+    await loadCosyvoice()
+  } catch (e) {
+    notice.value = { kind: 'error', text: `删除模型失败: ${errorText(e)}` }
+  }
+}
+
+async function pickCosySample(): Promise<void> {
+  const selection = await open({
+    multiple: false,
+    filters: [{ name: 'Audio sample', extensions: ['wav', 'mp3', 'flac', 'm4a'] }],
+  })
+  const path = selectedPath(selection)
+  if (path) cosySamplePath.value = path
+}
+
+async function registerCosyVoice(): Promise<void> {
+  const name = cosyVoiceName.value.trim()
+  if (!name || !cosySamplePath.value) {
+    notice.value = { kind: 'error', text: '请先输入音色名称并选择语音样本' }
+    return
+  }
+  cosyRegistering.value = true
+  notice.value = null
+  try {
+    const record = await TtsCosyvoice.createVoice(
+      name,
+      cosySelectedModel.value,
+      cosySamplePath.value,
+      (phase) => {
+        notice.value = { kind: 'success', text: phase }
+      },
+    )
+    notice.value = {
+      kind: 'success',
+      text: `音色注册成功: ${record.name} (${record.voice_id})`,
+    }
+    cosyVoiceName.value = ''
+    cosySamplePath.value = ''
+    await loadCosyvoice()
+  } catch (e) {
+    notice.value = {
+      kind: 'error',
+      text: `音色注册失败: ${errorText(e)}。可尝试改用公网 URL 注册。`,
+    }
+  } finally {
+    cosyRegistering.value = false
+  }
+}
+
+async function registerCosyVoiceFromUrl(): Promise<void> {
+  const name = cosyVoiceName.value.trim()
+  const url = cosyUrl.value.trim()
+  if (!name || !url) {
+    notice.value = { kind: 'error', text: '请先输入音色名称与公网音频 URL' }
+    return
+  }
+  cosyRegistering.value = true
+  notice.value = null
+  try {
+    const record = await TtsCosyvoice.createVoiceFromUrl(name, cosySelectedModel.value, url)
+    notice.value = { kind: 'success', text: `音色注册成功: ${record.name}` }
+    cosyVoiceName.value = ''
+    cosyUrl.value = ''
+    await loadCosyvoice()
+  } catch (e) {
+    notice.value = { kind: 'error', text: `音色注册失败: ${errorText(e)}` }
+  } finally {
+    cosyRegistering.value = false
+  }
+}
+
+async function removeCosyVoice(voice: TtsCosyvoice.CosyVoiceView): Promise<void> {
+  const confirmed = await dialogStore.confirm(
+    `确定删除音色「${voice.name}」吗？云端与本地记录将一并移除。`,
+    '删除音色',
+  )
+  if (!confirmed) return
+  try {
+    await TtsCosyvoice.deleteVoice(voice.voice_id)
+    await loadCosyvoice()
+  } catch (e) {
+    notice.value = { kind: 'error', text: `删除音色失败: ${errorText(e)}` }
+  }
+}
+
+async function runCosyPreview(): Promise<void> {
+  if (!cosySelectedModel.value || !cosyPreviewVoice.value) return
+  cosyPreviewing.value = true
+  notice.value = null
+  try {
+    const bytes = await TtsCosyvoice.synthesizePreview(
+      cosySelectedModel.value,
+      cosyPreviewVoice.value,
+      previewText.value.trim(),
+    )
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    audioUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
+    await nextTick()
+    if (audioRef.value) {
+      audioRef.value.src = audioUrl
+      await audioRef.value.play()
+    }
+  } catch (e) {
+    notice.value = { kind: 'error', text: `试听失败: ${errorText(e)}` }
+  } finally {
+    cosyPreviewing.value = false
+  }
+}
 
 async function triggerDownload(assetId: string): Promise<void> {
   if (downloadingId.value) return
