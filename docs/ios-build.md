@@ -28,6 +28,20 @@ pnpm install
 pnpm run init        # 生成图标 + 下载情绪模型（ONNX）到 data/third_party
 ```
 
+## 模拟器开发调试（tauri ios dev）
+
+```bash
+node scripts/prepare-bundled-resources.mjs 9   # 先生成 data.7z（首次必须，之后资源变更时重跑）
+pnpm tauri ios dev "iPhone 17 Pro"             # 设备名可换成任意可用模拟器（xcrun simctl list devices）
+```
+
+注意：
+- **`tauri ios dev` 前必须先有 `gen/apple/assets/data/data.7z`**（`prepare-bundled-resources.mjs` 生成），
+  否则首启播种失败，setup 报错后在 `did_finish_launching` 内触发不可 unwind 的 panic（SIGABRT）。
+- 不要给该命令设置相对路径的 `CARGO_TARGET_DIR`（如 `src-tauri/target`）：cargo 会把它解析到
+  `src-tauri` 内部（如 `src-tauri/src-tauri/target`），tauri-cli 的文件 watcher 监听到 target 目录
+  变化会无限触发重建-重部署循环。默认（不设该变量，产物落在 `src-tauri/target`）即正常。
+
 ## 打包无签名 IPA
 
 ### 一键脚本
@@ -89,11 +103,41 @@ IPA 作为 workflow artifact 上传（保留 7 天）。
 
 `gen/apple/assets/` 在 project.yml 中是 folder reference（`type: folder`），构建时**连同目录名**拷入
 bundle（`assets/data/data.7z` → `<bundle>/assets/data/data.7z`）。
-Rust 侧 `seed_via_fs_plugin` 的 iOS 读取路径为 `{resource_dir}/assets/data/data.7z`
-（Android 为 `{resource_dir}/data/data.7z`，因为 APK 的 resource_dir 就是 assets 根）。
+Rust 侧 `seed_via_fs_plugin` 的 iOS 读取路径为 `{resource_dir}/data/data.7z`：
+iOS 上 tauri 的 `resource_dir()` 返回的**就是** bundle 内的 `assets/` 目录
+（`<bundle>/assets/`，即 folder reference 的落点），不要再拼一层 `assets/`。
+Android 同样是 `{resource_dir}/data/data.7z`（APK 的 resource_dir 即 assets 根）。
+> 实测记录：曾写成 `{resource_dir}/assets/data/data.7z`，在 iOS 上解析为
+> `<bundle>/assets/assets/data/data.7z` 导致首启播种失败、setup 报错并触发
+> `did_finish_launching` 内不可 unwind 的 panic（SIGABRT）。CI 只打包不运行，
+> 因此该路径错误长期未被发现；`tauri ios dev` 首次真跑才暴露。
 
 > 兼容性说明：`prepare-desktop-resources.mjs` 的 `isMobile` 跳过逻辑对 Android 同样生效，
 > Android APK 也会因此去掉重复打包的 `.official` 文件（移动端播种本就只认 data.7z）。
+
+### 4. 前端安全区 / 视口适配（dvw/dvh + env）
+
+iOS 全屏 webview（`viewport-fit=cover`）里 `env(safe-area-inset-*)` 是真实非零值
+（iPhone 17 Pro 实测：top 62px / bottom 34px / left,right 0），而桌面/Android 桌面为 0。
+前端适配口径（`src/App.vue`、`src/composables/useZoom.ts`）：
+
+- **视口单位统一为动态视口** `dvw/dvh`（替换 `vw/vh`）：iOS 竖屏 `100vh` 不含顶部安全区、
+  横屏 `100vw` 含左右安全区，`dvw/dvh` 与视觉视口一致；桌面 `dvw/dvh === vw/vh`，零回归。
+- **`#app` 铺满整个视觉视口**（`position: fixed` + `100dvw×100dvh`），**不**整体内缩安全区——
+  各屏壁纸/背景因此天然全出血显示（含状态栏与 Home 指示器区域，不会出现上下黑边）。
+- **安全区内缩由各边缘元素自行处理**：全局已定义 `--safe-area-inset-*`（`base.css`，回退 env()）
+  与工具类 `.pt-safe/.pb-safe/.pl-safe/.pr-safe`（及 `-gap` 变体）；聊天输入区用
+  `.main-box { padding-bottom: env(safe-area-inset-bottom) }` 抬离 Home 指示器，
+  菜单 Logo（`StartLogo`）用 `top: env(safe-area-inset-top)` 避开状态栏。
+- **不要**整体收缩 `#app` 成安全区盒子：会留下裸露黑边（壁纸只画在 #app 内），
+  且与已在各 fixed 元素里加过 `var(--safe-area-inset-*)` 的偏移形成**双重内缩**。
+- 小屏菜单排布：`StartItem` 在 <768px 允许换行（`max-[767px]:whitespace-normal`）并缩小字号
+  （`clamp(26px,4vw,72px)`），否则"剧情模式（在自由模式进入自由模式）"这类长文案
+  会横向溢出被裁掉。
+
+> 实测记录：曾把 `#app` 内缩为安全区盒子（`top/env` + `100dvh - insets`），
+> 模拟器截图（`xcrun simctl io booted screenshot`）可见屏幕上下各一条黑/透明带——
+> 之前无视觉模型、纯靠尺寸推断没有发现；`tauri ios dev` + 截图人工核对才暴露。
 
 ## 已知限制
 
