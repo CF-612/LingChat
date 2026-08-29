@@ -1088,6 +1088,7 @@ export default {
       previewVoice: 'Preview',
       deleteVoice: 'Delete voice',
       voiceNamePlaceholder: 'Voice name (e.g. Nuo Yi)',
+      voiceNameLabel: 'Voice name',
       languageLabel: 'Sample language',
       languages: {
         zh: 'Chinese',

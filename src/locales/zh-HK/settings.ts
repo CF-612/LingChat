@@ -1086,6 +1086,7 @@ export default {
       "previewVoice": "試聽",
       "deleteVoice": "刪除音色",
       "voiceNamePlaceholder": "音色名稱（如：諾一）",
+      "voiceNameLabel": "音色名稱",
       "languageLabel": "樣本語種",
       "languages": {
         "zh": "中文",

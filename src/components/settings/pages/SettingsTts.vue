@@ -390,16 +390,14 @@
 
           <!-- 模型管理 -->
           <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
-            <label class="flex flex-col gap-1.5 text-xs text-white/60">
-              <span>{{ t('settings.tts.cosyvoice.modelLabel') }}</span>
-              <select
-                v-model="cosySelectedModel"
-                class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-                :disabled="!cosyKeyConfigured || cosyRegistering"
-              >
-                <option v-for="m in cosyModels" :key="m" :value="m" class="bg-slate-800">{{ m }}</option>
-              </select>
-            </label>
+            <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.modelLabel') }}</span>
+            <select
+              v-model="cosySelectedModel"
+              class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+              :disabled="!cosyKeyConfigured || cosyRegistering"
+            >
+              <option v-for="m in cosyModels" :key="m" :value="m" class="bg-slate-800">{{ m }}</option>
+            </select>
             <input
               v-model="cosyNewModel"
               class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-52"
@@ -481,6 +479,7 @@
 
           <!-- 导入样本注册 -->
           <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
+            <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.voiceNameLabel') }}</span>
             <input
               v-model="cosyVoiceName"
               class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-44"
@@ -488,23 +487,21 @@
               :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
               :disabled="!cosyKeyConfigured || cosyRegistering"
             />
-            <label class="flex flex-col gap-1.5 text-xs text-white/60">
-              <span>{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
-              <select
-                v-model="cosyLang"
-                class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-                :disabled="!cosyKeyConfigured || cosyRegistering"
+            <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
+            <select
+              v-model="cosyLang"
+              class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+              :disabled="!cosyKeyConfigured || cosyRegistering"
+            >
+              <option
+                v-for="lang in COSYVOICE_LANGUAGES"
+                :key="lang"
+                :value="lang"
+                class="bg-slate-800"
               >
-                <option
-                  v-for="lang in COSYVOICE_LANGUAGES"
-                  :key="lang"
-                  :value="lang"
-                  class="bg-slate-800"
-                >
-                  {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
-                </option>
-              </select>
-            </label>
+                {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
+              </option>
+            </select>
             <button
               v-if="!cosyUrlMode"
               class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"

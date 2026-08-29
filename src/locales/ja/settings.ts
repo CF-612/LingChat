@@ -1086,6 +1086,7 @@ export default {
       previewVoice: '試聴',
       deleteVoice: '音声を削除',
       voiceNamePlaceholder: '音声名（例：ノーイー）',
+      voiceNameLabel: '音声名',
       languageLabel: 'サンプル言語',
       languages: {
         zh: '中国語',

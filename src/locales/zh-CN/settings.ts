@@ -1092,6 +1092,7 @@ export default {
       previewVoice: '试听',
       deleteVoice: '删除音色',
       voiceNamePlaceholder: '音色名称（如：诺一）',
+      voiceNameLabel: '音色名称',
       languageLabel: '样本语种',
       languages: {
         zh: '中文',
