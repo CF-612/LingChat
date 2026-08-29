@@ -50,7 +50,7 @@ fn parse_policy(data: &Value) -> Result<UploadPolicy> {
 /// 上传本地音频，返回 oss:// 形式临时 URL。
 pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Result<String> {
     let resp = http_client()
-        .get(format!("{BASE_URL}{UPLOADS_PATH}"))
+        .post(format!("{BASE_URL}{UPLOADS_PATH}"))
         .query(&[("action", "getPolicy"), ("model", model)])
         .bearer_auth(api_key)
         .send()
