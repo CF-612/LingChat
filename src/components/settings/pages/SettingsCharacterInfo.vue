@@ -469,8 +469,7 @@ const schemas = computed<Record<string, FieldSchema[]>>(() => ({
       type: 'select',
       realtime: true,
       options: [
-        // IndexTTS 2.5 起 indextts2 支持日/西班牙/阿拉伯等多语言，日语不再对其隐藏
-        { label: t('settings.characterInfo.voiceLangOptions.ja'), value: 'ja' },
+        // 顺序:中、英、日、德、法、俄、韩、葡(用户指定);es/ar 仅 indextts2 可见
         { label: t('settings.characterInfo.voiceLangOptions.zh'), value: 'zh' },
         {
           label: t('settings.characterInfo.voiceLangOptions.en'),
@@ -480,10 +479,31 @@ const schemas = computed<Record<string, FieldSchema[]>>(() => ({
               s.tts_type,
             ),
         },
+        { label: t('settings.characterInfo.voiceLangOptions.ja'), value: 'ja' },
+        {
+          label: t('settings.characterInfo.voiceLangOptions.de'),
+          value: 'de',
+          visibleIf: (s) => s.tts_type === 'cosyvoice',
+        },
+        {
+          label: t('settings.characterInfo.voiceLangOptions.fr'),
+          value: 'fr',
+          visibleIf: (s) => s.tts_type === 'cosyvoice',
+        },
+        {
+          label: t('settings.characterInfo.voiceLangOptions.ru'),
+          value: 'ru',
+          visibleIf: (s) => s.tts_type === 'cosyvoice',
+        },
         {
           label: t('settings.characterInfo.voiceLangOptions.ko'),
           value: 'ko',
           visibleIf: (s) => ['gsv', 'opentts', 'cosyvoice'].includes(s.tts_type),
+        },
+        {
+          label: t('settings.characterInfo.voiceLangOptions.pt'),
+          value: 'pt',
+          visibleIf: (s) => s.tts_type === 'cosyvoice',
         },
         {
           label: t('settings.characterInfo.voiceLangOptions.es'),
@@ -496,6 +516,36 @@ const schemas = computed<Record<string, FieldSchema[]>>(() => ({
           visibleIf: (s) => s.tts_type === 'indextts2',
         },
       ],
+    },
+
+    {
+      // 中文方言:仅语音克隆TTS + 中文时可选
+      // （v3.5-flash 官方支持的 16 种方言:普通话 + 广东/东北/甘肃/贵州/河南/湖北/江西/
+      //   闽南/宁夏/山西/陕西/山东/上海/四川/天津/云南）
+      key: 'voice_dialect',
+      label: t('settings.characterInfo.fields.voiceDialect'),
+      type: 'select',
+      realtime: true,
+      options: [
+        { label: t('settings.characterInfo.dialectOptions.mandarin'), value: '' },
+        { label: t('settings.characterInfo.dialectOptions.cantonese'), value: '广东话' },
+        { label: t('settings.characterInfo.dialectOptions.dongbei'), value: '东北话' },
+        { label: t('settings.characterInfo.dialectOptions.gansu'), value: '甘肃话' },
+        { label: t('settings.characterInfo.dialectOptions.guizhou'), value: '贵州话' },
+        { label: t('settings.characterInfo.dialectOptions.henan'), value: '河南话' },
+        { label: t('settings.characterInfo.dialectOptions.hubei'), value: '湖北话' },
+        { label: t('settings.characterInfo.dialectOptions.jiangxi'), value: '江西话' },
+        { label: t('settings.characterInfo.dialectOptions.fujian'), value: '闽南话' },
+        { label: t('settings.characterInfo.dialectOptions.ningxia'), value: '宁夏话' },
+        { label: t('settings.characterInfo.dialectOptions.shanxi'), value: '山西话' },
+        { label: t('settings.characterInfo.dialectOptions.shaanxi'), value: '陕西话' },
+        { label: t('settings.characterInfo.dialectOptions.shandong'), value: '山东话' },
+        { label: t('settings.characterInfo.dialectOptions.shanghai'), value: '上海话' },
+        { label: t('settings.characterInfo.dialectOptions.sichuan'), value: '四川话' },
+        { label: t('settings.characterInfo.dialectOptions.tianjin'), value: '天津话' },
+        { label: t('settings.characterInfo.dialectOptions.yunnan'), value: '云南话' },
+      ],
+      visibleIf: (s) => s.tts_type === 'cosyvoice' && s.voice_lang === 'zh',
     },
 
     {

@@ -376,6 +376,7 @@ export default {
       "voiceCloneTts": "語音克隆TTS",
       "cosyVoiceVoice": "雲端音色",
       "noCloudVoice": "暫無雲端音色，請先到設定頁註冊",
+      "voiceDialect": "中文方言",
 
       "openttsVoice": "OpenTTS 音色標識"
     },
@@ -389,7 +390,30 @@ export default {
       "en": "英語",
       "ko": "韓語",
       "es": "西班牙語",
-      "ar": "阿拉伯語"
+      "ar": "阿拉伯語",
+      "de": "德語",
+      "fr": "法語",
+      "ru": "俄語",
+      "pt": "葡萄牙語"
+    },
+    "dialectOptions": {
+      "mandarin": "普通話",
+      "cantonese": "廣東話",
+      "dongbei": "東北話",
+      "gansu": "甘肅話",
+      "guizhou": "貴州話",
+      "henan": "河南話",
+      "hubei": "湖北話",
+      "jiangxi": "江西話",
+      "fujian": "閩南話",
+      "ningxia": "寧夏話",
+      "shanxi": "山西話",
+      "shaanxi": "陝西話",
+      "shandong": "山東話",
+      "shanghai": "上海話",
+      "sichuan": "四川話",
+      "tianjin": "天津話",
+      "yunnan": "雲南話"
     },
     "clothes": {
       "listTitle": "服裝列表",

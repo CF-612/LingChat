@@ -21,6 +21,10 @@ pub struct CosyvoiceAdapter {
     api_key: String,
     model: String,
     voice_id: String,
+    /// 合成目标语言（如 "zh"/"ja"…，提升数字/小语种合成效果；None = 自动检测）
+    language_hints: Option<String>,
+    /// 方言/指令控制（如"用四川话说话。"，仅复刻音色支持；None = 不指定）
+    instruction: Option<String>,
 }
 
 impl CosyvoiceAdapter {
@@ -29,7 +33,23 @@ impl CosyvoiceAdapter {
             api_key,
             model,
             voice_id,
+            language_hints: None,
+            instruction: None,
         }
+    }
+
+    /// 指定合成目标语言（官方 language_hints 参数，如 "zh"/"en"/"ja"）。
+    pub fn with_language_hints(mut self, lang: &str) -> Self {
+        self.language_hints = Some(lang.to_string());
+        self
+    }
+
+    /// 指定方言/指令（如"用四川话说话。"——复刻音色需指令才输出方言）。
+    pub fn with_instruction(mut self, instruction: &str) -> Self {
+        if !instruction.trim().is_empty() {
+            self.instruction = Some(instruction.to_string());
+        }
+        self
     }
 }
 
@@ -45,17 +65,23 @@ impl TtsAdapter for CosyvoiceAdapter {
             self.voice_id
         );
 
+        let mut input = serde_json::Map::new();
+        input.insert("text".into(), json!(text));
+        input.insert("voice".into(), json!(self.voice_id));
+        input.insert("format".into(), json!("wav"));
+        input.insert("sample_rate".into(), json!(24000));
+        input.insert("volume".into(), json!(50));
+        input.insert("rate".into(), json!(1.0));
+        input.insert("pitch".into(), json!(1.0));
+        if let Some(lang) = &self.language_hints {
+            input.insert("language_hints".into(), json!([lang]));
+        }
+        if let Some(instruction) = &self.instruction {
+            input.insert("instruction".into(), json!(instruction));
+        }
         let body = json!({
             "model": self.model,
-            "input": {
-                "text": text,
-                "voice": self.voice_id,
-                "format": "wav",
-                "sample_rate": 24000,
-                "volume": 50,
-                "rate": 1.0,
-                "pitch": 1.0,
-            }
+            "input": input,
         });
         let resp = http_client()
             .post(format!("{BASE_URL}{SYNTHESIS_PATH}"))

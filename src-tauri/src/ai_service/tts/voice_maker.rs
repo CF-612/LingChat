@@ -48,6 +48,8 @@ pub struct VoiceMaker {
     provider: TtsProvider,
     tts_type: String,
     lang: String,
+    /// 中文方言（仅 cosyvoice + lang=zh 时生效；空 = 普通话）
+    voice_dialect: Option<String>,
     character_path: Option<PathBuf>,
     temp_dir: PathBuf,
     audio_format: String,
@@ -111,11 +113,14 @@ fn gsv_prompt_language(prompt_text: &str) -> &'static str {
 
 fn segment_text_for_lang<'a>(lang: &str, segment: &'a EmotionSegment) -> Option<&'a str> {
     match lang {
-        // 译文统一存放在 japanese_text 字段（历史命名），ja/en/ko/es/ar 均优先取译文
-        "ja" | "en" | "ko" | "es" | "ar" if !segment.japanese_text.trim().is_empty() => {
+        // 译文统一存放在 japanese_text 字段（历史命名），非中文语言均优先取译文；
+        // 无译文时 en/ko/es/ar/de/fr/ru/pt 跳过（不朗读错误语言）
+        "ja" | "en" | "ko" | "es" | "ar" | "de" | "fr" | "ru" | "pt"
+            if !segment.japanese_text.trim().is_empty() =>
+        {
             Some(&segment.japanese_text)
         }
-        "en" | "ko" | "es" | "ar" => None,
+        "en" | "ko" | "es" | "ar" | "de" | "fr" | "ru" | "pt" => None,
         "zh" if !segment.following_text.trim().is_empty() => Some(&segment.following_text),
         _ if !segment.following_text.trim().is_empty() => Some(&segment.following_text),
         _ if !segment.japanese_text.trim().is_empty() => Some(&segment.japanese_text),
@@ -131,6 +136,7 @@ impl VoiceMaker {
             provider,
             tts_type: String::new(),
             lang: "ja".into(),
+            voice_dialect: None,
             character_path: None,
             temp_dir,
             audio_format,
@@ -149,6 +155,11 @@ impl VoiceMaker {
 
     pub fn set_lang(&mut self, lang: impl Into<String>) {
         self.lang = lang.into();
+    }
+
+    /// 设置中文方言（仅 cosyvoice + lang=zh 时生效；空 = 普通话）。
+    pub fn set_voice_dialect(&mut self, dialect: Option<String>) {
+        self.voice_dialect = dialect;
     }
 
     pub fn set_character_path(&mut self, path: Option<PathBuf>) {
@@ -440,8 +451,22 @@ impl VoiceMaker {
                         .map(|v| v.model.clone())
                         .or_else(|| self.tts_config.cosyvoice_models.first().cloned())
                         .unwrap_or_else(|| "cosyvoice-v3.5-flash".to_string());
-                    self.provider.cosyvoice =
-                        Some(Arc::new(CosyvoiceAdapter::new(api_key, model, voice_id)));
+                    let mut adapter = CosyvoiceAdapter::new(api_key, model, voice_id);
+                    // 方言：仅中文生效，通过 instruction 指令触发（复刻音色需指令才输出方言）；
+                    // 其余语言：用 language_hints 指定合成目标语言，提升数字/小语种效果
+                    if self.lang == "zh" {
+                        if let Some(dialect) = self
+                            .voice_dialect
+                            .clone()
+                            .filter(|d| !d.trim().is_empty())
+                        {
+                            tracing::info!("CosyVoice 方言模式: {dialect}");
+                            adapter = adapter.with_instruction(&format!("用{dialect}说话。"));
+                        }
+                    } else if !self.lang.is_empty() {
+                        adapter = adapter.with_language_hints(&self.lang);
+                    }
+                    self.provider.cosyvoice = Some(Arc::new(adapter));
                 }
             }
             "indextts2" => {
