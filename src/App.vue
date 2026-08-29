@@ -166,6 +166,19 @@ const syncVisualViewport = () => {
   lockScroll()
 }
 
+// 旋转/分屏后安全区基线失效：iPhone 竖屏底部 inset ≈34px、横屏 ≈21px（灵动岛移到左右），
+// iPad 台前调度改窗口尺寸同理。挂载时采样的基线在旋转后是旧值，这里强制重采样：
+//   1. 先清掉本模块写入的内联覆盖（iOS 回落 :root 的 env() 实时解析新值；
+//      Android 的 --safe-area-inset-* 由 MainActivity insets 监听注入，旋转后监听
+//      会重新触发注入，此处的临时清空无影响）
+//   2. 重置基线标记，下一次 sync 重读 env() 解析值作为新基线
+const handleOrientationChange = () => {
+  document.documentElement.style.removeProperty('--safe-area-inset-bottom')
+  safeBaseInitialized = false
+  currentLift = 0
+  syncVisualViewport()
+}
+
 // 仅主窗口挂载全局弹窗（通知/成就/对话确认），日志窗口等复用 App.vue 的窗口不弹
 const isMainWindow = getCurrentWindow().label === 'main'
 
@@ -247,7 +260,7 @@ onMounted(async () => {
     vv.addEventListener('resize', syncVisualViewport)
     vv.addEventListener('scroll', syncVisualViewport)
   }
-  window.addEventListener('orientationchange', syncVisualViewport)
+  window.addEventListener('orientationchange', handleOrientationChange)
   // 硬锁滚动：任何滚动（键盘 focus-scroll / 手势）立即归零
   window.addEventListener('scroll', lockScroll, { passive: true, capture: true })
   document.addEventListener('touchmove', preventRootTouchScroll, { passive: false })
@@ -311,7 +324,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
-  window.removeEventListener('orientationchange', syncVisualViewport)
+  window.removeEventListener('orientationchange', handleOrientationChange)
   window.removeEventListener('scroll', lockScroll, { capture: true } as any)
   document.removeEventListener('touchmove', preventRootTouchScroll)
   document.removeEventListener('focusin', syncVisualViewport, true)
