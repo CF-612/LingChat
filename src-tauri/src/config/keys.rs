@@ -75,6 +75,11 @@ pub const OPENTTS_VOICE: &str = "tts.opentts_voice";
 pub const TTS_AUDIO_FORMAT: &str = "tts.audio_format";
 pub const VOICE_LANG: &str = "tts.voice_lang";
 
+// ========== TTS 云端语音克隆(CosyVoice) ==========
+pub const COSYVOICE_API_KEY: &str = "tts.cosyvoice_api_key";
+pub const COSYVOICE_MODELS: &str = "tts.cosyvoice_models";
+pub const COSYVOICE_VOICES: &str = "tts.cosyvoice_voices";
+
 // ========== 主动对话系统 ==========
 pub const ENABLE_PROACTIVE_SYSTEM: &str = "ENABLE_PROACTIVE_SYSTEM";
 pub const MAX_PROACTIVE_TIMES: &str = "MAX_PROACTIVE_TIMES";
