@@ -395,11 +395,11 @@
             </p>
             <div
               v-if="cosyVoices.length === 0"
-              class="border-y border-white/10 py-[22px] text-center text-[13px] text-white/40"
+              class="border-t border-white/10 py-[22px] text-center text-[13px] text-white/40"
             >
               {{ t('settings.tts.cosyvoice.voicesEmpty') }}
             </div>
-            <div v-else class="divide-y divide-white/8 border-y border-white/10">
+            <div v-else class="divide-y divide-white/8 border-t border-white/10">
               <div
                 v-for="voice in cosyVoices"
                 :key="voice.voice_id"
@@ -444,7 +444,7 @@
           </div>
 
           <!-- 导入音色(独立小节,与试听小节结构一致):音色名称独占一行,语种/样本/注册在下方 -->
-          <section class="mt-6 pt-6">
+          <section class="mt-6 border-t border-white/10 pt-6">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h3 class="text-sm font-semibold text-white">{{ t('settings.tts.cosyvoice.importTitle') }}</h3>
@@ -650,7 +650,7 @@ const cosySamplePath = ref('')
 const cosyRegistering = ref(false)
 const cosyPreviewVoice = ref('')
 const cosyPreviewing = ref(false)
-// 样本语种(cosyvoice-v3.5-flash 的 language_hints 官方支持范围)
+// 参考音频语言(cosyvoice-v3.5-flash 的 language_hints 官方支持范围)
 const COSYVOICE_LANGUAGES = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'ru', 'pt', 'th', 'id', 'vi'] as const
 // 云端合成固定使用音色所属模型(注册模型必须与之一致);列表为空时回退官方默认
 const DEFAULT_COSYVOICE_MODEL = 'cosyvoice-v3.5-flash'
@@ -952,7 +952,12 @@ async function removeDeberta(): Promise<void> {
 // String() 成逗号字符串,播放必然失败。
 function toAudioBuffer(bytes: Uint8Array | ArrayBuffer | number[]): ArrayBuffer {
   if (bytes instanceof ArrayBuffer) return bytes
-  if (ArrayBuffer.isView(bytes)) return bytes.buffer
+  if (ArrayBuffer.isView(bytes)) {
+    // TypedArray/DataView 可能是更大 ArrayBuffer 的部分视图(byteOffset/byteLength 限定),
+    // 直接返回 bytes.buffer 会带上视图外的无关字节,必须切出精确区间。
+    // Tauri invoke 返回的底层 buffer 实际一定是 ArrayBuffer(非 SharedArrayBuffer),断言安全
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  }
   return new Uint8Array(bytes).buffer
 }
 

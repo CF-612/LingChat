@@ -6,9 +6,9 @@
 
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use async_trait::async_trait;
-use serde_json::{json, Value as JsonValue};
+use serde_json::{Value as JsonValue, json};
 
 use crate::ai_service::tts::adapters::http_client;
 use crate::ai_service::tts::provider::TtsAdapter;
@@ -95,7 +95,9 @@ impl TtsAdapter for CosyvoiceAdapter {
             let body_str = body.to_string();
             let code = body["code"].as_str().unwrap_or("HTTP_ERROR");
             let message = body["message"].as_str().unwrap_or(&body_str);
-            return Err(anyhow!("CosyVoice 合成失败: {code}: {message} (HTTP {status})"));
+            return Err(anyhow!(
+                "CosyVoice 合成失败: {code}: {message} (HTTP {status})"
+            ));
         }
         let body: JsonValue = resp.json().await?;
         // finish_reason 非 stop 说明合成未完成（截断/错误）

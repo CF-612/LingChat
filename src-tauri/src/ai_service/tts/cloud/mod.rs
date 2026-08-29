@@ -65,14 +65,7 @@ impl CloudVoiceService {
         progress("上传语音样本中…");
         let url = upload_audio(&self.api_key, model, file_path).await?;
         progress("提交复刻任务…");
-        let voice_id = create_voice(
-            &self.api_key,
-            model,
-            &prefix,
-            &url,
-            Some(&[language]),
-        )
-        .await?;
+        let voice_id = create_voice(&self.api_key, model, &prefix, &url, Some(&[language])).await?;
         tracing::info!(
             "CosyVoice 音色已提交审核: model={} prefix={} name={} lang={} voice_id={}",
             model,

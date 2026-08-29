@@ -1090,7 +1090,7 @@ export default {
       deleteVoice: '删除音色',
       voiceNamePlaceholder: '音色名称',
       voiceNameLabel: '音色名称（必填）',
-      languageLabel: '参考音频语言（必填）',
+      languageLabel: '参考音频语言（必选）',
       languages: {
         zh: '中文',
         en: '英语',

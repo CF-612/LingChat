@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use super::CloudVoiceService;
+use crate::ai_service::tts::provider::TtsAdapter;
 use crate::config::keys;
 use crate::config::tts::{CosyVoiceRecord, TtsConfig};
-use crate::ai_service::tts::provider::TtsAdapter;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CosyvoiceConfig {
@@ -78,11 +78,10 @@ pub async fn cosyvoice_create_voice(
 ) -> Result<CosyVoiceRecord, String> {
     // Android 上 dialog 返回 content:// URI,需先经 SAF bridge 复制到本地 cache
     //（桌面端原样返回路径;staged 文件用完必须删除）
-    let source = crate::ai_service::tts::local::saf_bridge::prepare_file_import_source(
-        &app, &file_path,
-    )
-    .await
-    .map_err(|e| format!("读取语音样本失败: {e}"))?;
+    let source =
+        crate::ai_service::tts::local::saf_bridge::prepare_file_import_source(&app, &file_path)
+            .await
+            .map_err(|e| format!("读取语音样本失败: {e}"))?;
     let path = source.path;
 
     let result = async {
@@ -95,7 +94,11 @@ pub async fn cosyvoice_create_voice(
                 meta.len() as f64 / (1024.0 * 1024.0)
             ));
         }
-        let language = if language.trim().is_empty() { "zh" } else { language.trim() };
+        let language = if language.trim().is_empty() {
+            "zh"
+        } else {
+            language.trim()
+        };
         let svc = service(&app).map_err(|e| e.to_string())?;
         let record = svc
             .submit_from_file(&model, &name, &path, language, &|phase: &str| {
@@ -119,10 +122,7 @@ pub async fn cosyvoice_create_voice(
 
 /// 查询单音色审核状态（小写），结果写回本地缓存；未注册过该音色也照常查询。
 #[tauri::command]
-pub async fn cosyvoice_voice_status(
-    app: AppHandle,
-    voice_id: String,
-) -> Result<String, String> {
+pub async fn cosyvoice_voice_status(app: AppHandle, voice_id: String) -> Result<String, String> {
     let svc = service(&app).map_err(|e| e.to_string())?;
     let status = svc.status(&voice_id).await.map_err(|e| e.to_string())?;
     let mut records = read_voice_records(&app);
@@ -213,12 +213,11 @@ pub async fn cosyvoice_synthesize_preview(
     }
 
     // 复用 adapter 的合成逻辑（与对话链路同构）
-    let adapter =
-        crate::ai_service::tts::adapters::cosyvoice::CosyvoiceAdapter::new(
-            svc.api_key().to_string(),
-            model,
-            voice_id,
-        );
+    let adapter = crate::ai_service::tts::adapters::cosyvoice::CosyvoiceAdapter::new(
+        svc.api_key().to_string(),
+        model,
+        voice_id,
+    );
     let result = adapter.generate_voice(&text, "").await;
     match &result {
         Ok(bytes) => tracing::info!("CosyVoice 试听合成成功: {} bytes", bytes.len()),

@@ -70,7 +70,7 @@ pub struct TtsConfig {
     /// CosyVoice 云 API 密钥（空 = 未配置）
     #[serde(default)]
     pub cosyvoice_api_key: Option<String>,
-    /// CosyVoice 可配置模型列表（用户可在设置页增删；首个为默认模型）
+    /// CosyVoice 模型列表（首个为默认模型；现由配置文件维护，无设置页入口）
     #[serde(default = "default_cosyvoice_models")]
     pub cosyvoice_models: Vec<String>,
     /// 本地音色映射记录：云端 voice_id 乱码 → 用户命名等展示信息

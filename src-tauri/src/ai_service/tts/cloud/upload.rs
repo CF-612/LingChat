@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 use crate::ai_service::tts::adapters::http_client;
@@ -59,7 +59,9 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
         let body_str = body.to_string();
         let code = body["code"].as_str().unwrap_or("HTTP_ERROR");
         let message = body["message"].as_str().unwrap_or(&body_str);
-        return Err(anyhow!("获取上传凭证失败: {code}: {message} (HTTP {status})"));
+        return Err(anyhow!(
+            "获取上传凭证失败: {code}: {message} (HTTP {status})"
+        ));
     }
     let v: Value = resp.json().await?;
     let policy = parse_policy(&v["data"])?;
@@ -73,16 +75,16 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
     // uuid 前 8 位前缀防同名文件覆盖（同一 upload_dir 下已有同名 key 会静默覆盖）
     let uuid_prefix = &uuid::Uuid::new_v4().simple().to_string()[..8];
     let key = format!("{}/{}-{}", policy.upload_dir, uuid_prefix, file_name);
-    tracing::debug!("CosyVoice OSS 直传: host={} key={}", policy.upload_host, key);
+    tracing::debug!(
+        "CosyVoice OSS 直传: host={} key={}",
+        policy.upload_host,
+        key
+    );
 
     let bytes = tokio::fs::read(file_path)
         .await
         .map_err(|e| anyhow!("读取音频文件失败: {e}"))?;
-    tracing::info!(
-        "CosyVoice 上传样本: {} ({} bytes)",
-        file_name,
-        bytes.len()
-    );
+    tracing::info!("CosyVoice 上传样本: {} ({} bytes)", file_name, bytes.len());
 
     let form = reqwest::multipart::Form::new()
         .text("OSSAccessKeyId", policy.oss_access_key_id.clone())
@@ -91,7 +93,10 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
         .text("Signature", policy.signature.clone())
         .text("policy", policy.policy.clone())
         .text("x-oss-object-acl", policy.x_oss_object_acl.clone())
-        .text("x-oss-forbid-overwrite", policy.x_oss_forbid_overwrite.clone())
+        .text(
+            "x-oss-forbid-overwrite",
+            policy.x_oss_forbid_overwrite.clone(),
+        )
         .text("key", key.clone())
         .text("success_action_status", "200")
         .part(

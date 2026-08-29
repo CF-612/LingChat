@@ -4,8 +4,8 @@
 //! 通过 `input.action` 区分操作（create_voice / query_voice / list_voice / delete_voice）。
 //! 认证：Bearer API Key。
 
-use anyhow::{anyhow, Result};
-use serde_json::{json, Value};
+use anyhow::{Result, anyhow};
+use serde_json::{Value, json};
 
 use crate::ai_service::tts::adapters::http_client;
 
@@ -62,7 +62,9 @@ async fn post_customization(api_key: &str, body: Value) -> Result<Value> {
         let body_str = body.to_string();
         let code = body["code"].as_str().unwrap_or("HTTP_ERROR");
         let message = body["message"].as_str().unwrap_or(&body_str);
-        return Err(anyhow!("CosyVoice 请求失败: {code}: {message} (HTTP {status})"));
+        return Err(anyhow!(
+            "CosyVoice 请求失败: {code}: {message} (HTTP {status})"
+        ));
     }
     Ok(resp.json().await?)
 }

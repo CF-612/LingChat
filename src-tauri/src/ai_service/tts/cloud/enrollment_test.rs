@@ -1,6 +1,8 @@
 use serde_json::json;
 
-use crate::ai_service::tts::cloud::enrollment::{create_voice_body, parse_voice_id, parse_voice_status};
+use crate::ai_service::tts::cloud::enrollment::{
+    create_voice_body, parse_voice_id, parse_voice_status,
+};
 
 #[test]
 fn create_voice_body_shape() {
@@ -20,7 +22,12 @@ fn create_voice_body_shape() {
 
 #[test]
 fn create_voice_body_default_language_hints() {
-    let body = create_voice_body("cosyvoice-v3.5-flash", "myvoice", "https://x.com/a.wav", None);
+    let body = create_voice_body(
+        "cosyvoice-v3.5-flash",
+        "myvoice",
+        "https://x.com/a.wav",
+        None,
+    );
     assert_eq!(body["input"]["language_hints"][0], "zh");
 }
 
