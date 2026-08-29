@@ -111,6 +111,12 @@ console.log(`Copied data.7z to ${androidAssetsDir}`);
 const iosGenApple = join(srcTauri, 'gen', 'apple');
 if (existsSync(iosGenApple)) {
   const iosDataDir = join(iosGenApple, 'assets', 'data');
+  // 与 Android 分支一致：先清空再写入，避免旧构建残留
+  // （如曾误放入 gen/apple/assets/data/ 的 .official/third_party 真实文件）
+  // 被 folder reference 整体打进 iOS bundle，导致包体膨胀与资源重复。
+  if (existsSync(iosDataDir)) {
+    rmSync(iosDataDir, { recursive: true });
+  }
   mkdirSync(iosDataDir, { recursive: true });
   copyFileSync(archivePath, join(iosDataDir, 'data.7z'));
   console.log(`Copied data.7z to ${iosDataDir}`);

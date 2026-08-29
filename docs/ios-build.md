@@ -63,7 +63,10 @@ pnpm tauri ios build --no-sign             # 3. 构建（beforeBuildCommand 自�
 ### CI
 
 `.github/workflows/build-ios.yml`（手动触发）在 `macos-latest` 上执行同一流程，
-IPA 作为 workflow artifact 上传（保留 7 天）。
+IPA 作为 workflow artifact 上传（保留 7 天）。构建步骤直接复用
+`pnpm run ios:build`（`build-ios-unsigned.sh`），与本地流程单一事实来源，
+workflow 的 `compression` 输入通过 `IOS_BUNDLED_7Z_LEVEL` 环境变量透传给
+`prepare-bundled-resources.mjs`（默认 9）。
 
 ## 侧载安装
 
@@ -183,14 +186,56 @@ macOS runner 实测复现；错误信息中变量名后出现 U+FFFD，文件本
   使 Xcode 脚本阶段直接经 node 调用 tauri CLI，完全绕开包管理器。
   `tauri ios build` 的 `synchronize_project_config` 不会重写 shellScript，patch 持久生效。
 
+### 本地 gen/apple 残留被 folder reference 整包（包体膨胀）
+
+`gen/apple/` 被 `.gitignore` 忽略（本地产物），其中 `gen/apple/assets/data/` 以
+folder reference（`type: folder`）参与资源阶段——**目录里有什么就进什么包**。
+若此前构建/实验把 `.official` 真实文件或 `third_party` 模型目录留在了
+`gen/apple/assets/data/` 下，会与 `data.7z` 重复进包（实测 IPA 膨胀到 216 MB，
+本应约 172 MB），且桌面 `.official` 内容重复出现。
+
+对策：`scripts/prepare-bundled-resources.mjs` 的 iOS 部署分支与 Android 分支对齐，
+**先清空 `gen/apple/assets/data/` 再写入**，确保 bundle 内的 `assets/data/` 只含
+`data.7z`。CI 每次全新生成工程、无此问题，但本地反复构建时必须通过该脚本部署资源。
+
+### 本地并发 xcodebuild 会互相破坏 DerivedData
+
+`tauri ios build` / `tauri ios dev` / 手动 `xcodebuild` 共享同一个
+`~/Library/Developer/Xcode/DerivedData/ling_chat-*`。多个 xcodebuild 并发（如
+`tauri ios dev` 挂着又跑 `tauri ios build`）会导致 `build.db` 磁盘 I/O 错误与
+clang `.resp` 响应文件丢失（`** ARCHIVE FAILED **`）。本地排查顺序：确认无残留
+`tauri.js`/`xcodebuild` 进程 → `rm -rf ~/Library/Developer/Xcode/DerivedData/ling_chat-*`
+→ 重跑。CI 为全新环境，不会触发。
+
+### 已知但未处理的链接警告
+
+`Externals/arm64/release/libapp.a`（ORT 相关静态库）按 iOS 15.1 编译，而工程
+deployment target 为 14.0：`ld: warning: object file ... was built for newer 'iOS'
+version (15.1) than being linked (14.0)`。当前仅警告、构建不受影响；若未来需要
+保证 iOS 14 实机运行，应把 deployment target 统一提升到 15.1（影响面：XcodeGen
+工程每次 `tauri ios init` 后需重新设定，需在 configure 脚本中兜底）。
+
 ## 构建验证
 
 - 本仓库的 iOS 构建已在 GitHub Actions（`build-ios.yml`，macOS arm64 runner）上
   **实测通过**：配置工程 → 打包 `data.7z` → `tauri ios build --no-sign` 产出无签名
   IPA（`src-tauri/gen/apple/build/arm64/LingChat.ipa`，约 170 MB，含前端 + Rust +
   情绪模型 data.7z），并作为 workflow artifact `lingchat-ios-unsigned` 上传。
-- 实测过程中修复的三个平台级问题（见上文踩坑记录）：
-  1. macOS bash 3.2 多字节解析 bug → `.sh` 脚本纯 ASCII；
-  2. pnpm 11 在 Xcode 脚本阶段无 TTY 中止 → patch pbxproj 绕开 pnpm；
-  3. IPA 产物路径为 `gen/apple/build/<arch>/`（非 `gen/apple/target/`）。
+- **本地实测结论（macOS 26.6.1 + Xcode 26.6 + iPhone 17 Pro 模拟器 iOS 26.5）**：
+  - 打包流程 `pnpm run ios:build` 全链路通过，IPA 约 **172 MB**；
+  - `tauri ios dev` 安装到模拟器后 app 正常启动：主菜单完整显示（壁纸插画 /
+    Logo / 全部菜单项），安全区适配正确（状态栏与 Home 指示器无遮挡）；
+  - `data.7z` 首启播种成功：`Documents/` 下 `game_data/`（3 个角色、背景、剧本、
+    技能，135 个文件）+ `data_manifest.json`（147 条）+ `third_party/` 模型齐全；
+  - IPA 内 `assets/data/data.7z`（74 MB）与 Rust 侧读取路径
+    `{resource_dir}/data/data.7z` 对应，bundled `data/.official/` 仅含空占位。
+- 实测过程中修复的问题（详见踩坑记录）：
+  1. 本地 `gen/apple/assets/data/` 旧残留（`.official` 真实文件 + 重复模型）被
+     folder reference 整体打进包体，IPA 膨胀到 216 MB → `prepare-bundled-resources.mjs`
+     的 iOS 部署改为**先清空再写入**（与 Android 分支一致），修复后 172 MB；
+  2. `Info.ios.plist` 的 `UIDeviceFamily` 与 `TARGETED_DEVICE_FAMILY` build setting
+     冲突（xcodebuild 警告且该键会被覆盖）→ 从 `Info.ios.plist` 移除，设备族统一
+     由 `configure-ios-project.sh` 归一化；
+  3. `build-ios-unsigned.sh` 内置 `CI=true` + `pnpm_config_*` 环境变量，本地直跑
+     不再因 pnpm 11 无 TTY 依赖校验中止（此前只有 CI 步骤设置，本地脚本缺失）。
 

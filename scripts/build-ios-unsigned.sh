@@ -18,6 +18,14 @@
 # ============================================================================
 set -euo pipefail
 
+# pnpm 11 的 verify-deps-before-run 在无 TTY 环境下（脚本/CI 触发、Xcode
+# Build Rust Code 阶段）会因模块目录需要清空重装而直接中止
+# （ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY）。与 build-ios.yml 的 job env
+# 保持一致：显式关闭依赖校验与清理确认（.npmrc 中的同名键会被 pnpm 11 过滤）。
+export CI=true
+export pnpm_config_verify_deps_before_run=false
+export pnpm_config_confirm_modules_purge=false
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -27,7 +35,9 @@ bash scripts/configure-ios-project.sh
 
 # --- 2. Pack resources into data.7z ------------------------------------------
 echo "[build-ios] Step 2/3: packing default resources into data.7z (incl. third_party models)"
-node scripts/prepare-bundled-resources.mjs 9
+# 压缩等级 0-9 可选（默认 9），与 prepare-bundled-resources.mjs 的参数约定一致；
+# CI 通过 IOS_BUNDLED_7Z_LEVEL 环境变量透传 workflow 的 compression 输入。
+node scripts/prepare-bundled-resources.mjs "${IOS_BUNDLED_7Z_LEVEL:-9}"
 
 # --- 3. Unsigned build --------------------------------------------------------
 echo "[build-ios] Step 3/3: pnpm tauri ios build --no-sign (unsigned IPA)"

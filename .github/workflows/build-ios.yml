@@ -14,7 +14,10 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 90
     env:
+      # workflow_dispatch 的 compression 输入 → 脚本内 data.7z 压缩等级（默认 9）
+      IOS_BUNDLED_7Z_LEVEL: ${{ github.event.inputs.compression }}
       # 移动端构建必须启用：让 webview 从应用内嵌资产加载前端
       # （tauri CLI 会在 iOS 构建时自动附加 custom-protocol feature）
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 's'
@@ -59,25 +62,13 @@ jobs:
           pnpm install
           pnpm run init
 
-      - name: 初始化并配置 iOS Xcode 工程（iPhone + iPad）
-        run: |
-          echo "=== blob sha vs worktree sha (must be equal) ==="
-          git rev-parse HEAD:scripts/configure-ios-project.sh
-          git hash-object scripts/configure-ios-project.sh
-          echo "=== run configure script ==="
-          bash scripts/configure-ios-project.sh
-
-      - name: 打包默认资源 data.7z
-        run: node scripts/prepare-bundled-resources.mjs ${{ github.event.inputs.compression }}
-
-      - name: 构建无签名 IPA
-        # beforeBuildCommand runs prepare-desktop-resources.mjs + pnpm build automatically;
-        # --no-sign skips code signing (no certificate / provisioning profile needed)
-        env:
-          # pnpm 11 在 Xcode 的 Build Rust Code 脚本里做依赖校验时会触发自动 install；
-          # 显式 CI=true + .npmrc 的 verify-deps-before-run=false 避免无 TTY 中止
-          CI: "true"
-        run: pnpm tauri ios build --no-sign
+      - name: 打包与构建无签名 IPA
+        # pnpm run ios:build = build-ios-unsigned.sh，内部依次执行：
+        #   configure-ios-project.sh（init 工程 + iPhone/iPad 兜底）
+        #   prepare-bundled-resources.mjs（data.7z → gen/apple/assets/data/）
+        #   pnpm tauri ios build --no-sign（含 beforeBuildCommand 前端构建）
+        # 脚本内部已设置 CI/pnpm_config_* 环境变量，与 job env 一致。
+        run: pnpm run ios:build
 
       - name: 上传 IPA
         uses: actions/upload-artifact@v4

@@ -17,11 +17,11 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 
-	<!-- 明确声明兼容 iPhone (1) 与 iPad (2)，与工程 TARGETED_DEVICE_FAMILY=1,2 保持一致 -->
-	<key>UIDeviceFamily</key>
-	<array>
-		<integer>1</integer>
-		<integer>2</integer>
-	</array>
+	<!--
+		设备族（iPhone/iPad）不在这里声明：UIDeviceFamily 是派生子键，
+		tauri-cli 合并 Info.plist 时以 TARGETED_DEVICE_FAMILY build setting
+		为准并覆盖此处声明（xcodebuild 会对此输出警告）。设备族统一由
+		scripts/configure-ios-project.sh 归一化 TARGETED_DEVICE_FAMILY = "1,2"。
+	-->
 </dict>
 </plist>
