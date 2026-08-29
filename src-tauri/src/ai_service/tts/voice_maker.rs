@@ -14,6 +14,7 @@ use futures_util::future::join_all;
 use crate::ai_service::message_system::processor::EmotionSegment;
 use crate::ai_service::tts::adapters::aivis::AivisAdapter;
 use crate::ai_service::tts::adapters::bv2::Bv2Adapter;
+use crate::ai_service::tts::adapters::cosyvoice::CosyvoiceAdapter;
 use crate::ai_service::tts::adapters::fish_s2::FishS2Adapter;
 use crate::ai_service::tts::adapters::gsv::GsvAdapter;
 use crate::ai_service::tts::adapters::indextts::IndexTtsAdapter;
@@ -39,6 +40,7 @@ pub struct TtsAvailability {
     pub opentts: bool,
     pub fish_s2: bool,
     pub sbv2_local: bool,
+    pub cosyvoice: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -194,6 +196,8 @@ impl VoiceMaker {
             non_empty(&cfg.fish_s2_voice) || !self.tts_config.fish_s2_voice.trim().is_empty();
         // Local SBV2 only needs a voice_id; engine readiness is checked later
         let sbv2_local = non_empty(&cfg.sbv2_local_voice_id);
+        // CosyVoice 云端音色：角色选了 voice_id 即可用（Key 缺失在初始化时禁用）
+        let cosyvoice = non_empty(&cfg.cosyvoice_voice_id);
 
         self.availability = TtsAvailability {
             sva,
@@ -205,6 +209,7 @@ impl VoiceMaker {
             opentts,
             fish_s2,
             sbv2_local,
+            cosyvoice,
         };
     }
 
@@ -416,6 +421,27 @@ impl VoiceMaker {
                         tracing::warn!("Fish S2 初始化失败: {error}");
                         self.provider.disable();
                     }
+                }
+            }
+            "cosyvoice" if self.availability.cosyvoice => {
+                let api_key = self.tts_config.cosyvoice_api_key.clone().unwrap_or_default();
+                if api_key.trim().is_empty() {
+                    tracing::warn!("CosyVoice API 密钥未设置,禁用 TTS");
+                    self.provider.disable();
+                } else {
+                    let voice_id = cfg.cosyvoice_voice_id.clone().unwrap_or_default();
+                    // 合成模型必须与注册音色时的模型一致：优先从音色记录解析，
+                    // 找不到（音色记录被清）回退全局默认模型
+                    let model = self
+                        .tts_config
+                        .cosyvoice_voices
+                        .iter()
+                        .find(|v| v.voice_id == voice_id)
+                        .map(|v| v.model.clone())
+                        .or_else(|| self.tts_config.cosyvoice_models.first().cloned())
+                        .unwrap_or_else(|| "cosyvoice-v3.5-flash".to_string());
+                    self.provider.cosyvoice =
+                        Some(Arc::new(CosyvoiceAdapter::new(api_key, model, voice_id)));
                 }
             }
             "indextts2" => {

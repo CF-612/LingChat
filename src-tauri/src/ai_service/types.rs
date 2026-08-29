@@ -321,6 +321,7 @@ pub struct VoiceModel {
     pub sbv2_local_sdp_ratio: Option<f32>,
     pub sbv2_local_cloud_fallback_model: Option<String>,
     pub sbv2_local_cloud_fallback_speaker_id: Option<String>,
+    pub cosyvoice_voice_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
