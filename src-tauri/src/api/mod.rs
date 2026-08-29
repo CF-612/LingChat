@@ -1,17 +1,18 @@
 pub mod achievement;
 pub mod adventure;
 pub mod ambient;
+pub mod asr;
 pub mod asset;
 pub mod background;
 pub mod character;
 pub mod chat;
+pub mod codex;
 pub mod font;
 pub mod game;
 pub mod locale;
+pub mod live2d;
 pub mod music;
 pub mod pet;
-// 插件命令由 RustPython 驱动，移动端（Android/iOS）不编译
-#[cfg(desktop)]
 pub mod plugins;
 pub mod save;
 pub mod scene;
@@ -21,6 +22,7 @@ pub mod script;
 pub mod script_editor;
 pub mod settings;
 pub mod tool_settings;
+pub mod settings_snapshot;
 pub mod workshop;
 
 use std::path::PathBuf;
