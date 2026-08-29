@@ -1087,7 +1087,7 @@ export default {
       retryStatus: 'Re-check',
       previewVoice: 'Preview',
       deleteVoice: 'Delete voice',
-      voiceNamePlaceholder: 'Voice name (e.g. Nuo Yi)',
+      voiceNamePlaceholder: 'Voice name',
       voiceNameLabel: 'Voice name',
       languageLabel: 'Sample language',
       languages: {

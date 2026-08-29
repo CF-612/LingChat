@@ -1091,7 +1091,7 @@ export default {
       retryStatus: '重查状态',
       previewVoice: '试听',
       deleteVoice: '删除音色',
-      voiceNamePlaceholder: '音色名称（如：诺一）',
+      voiceNamePlaceholder: '音色名称',
       voiceNameLabel: '音色名称',
       languageLabel: '样本语种',
       languages: {

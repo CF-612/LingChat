@@ -15,7 +15,7 @@ export default {
     toolsTitle: '工具設定',
     toolsDesc: '設定 AI 可以用嘅工具，例如網頁搜尋（上網查資料）',
     toolsButton: '入去工具設定界面',
-    ttsTitle: '本地 TTS',
+    ttsTitle: 'TTS 設定',
     ttsDesc: '下載並管理 DeBERTa 與人物語音模型，離線使用本地 TTS 引擎',
     ttsButton: '進入本地 TTS 介面',
     asrTitle: '語音識別',

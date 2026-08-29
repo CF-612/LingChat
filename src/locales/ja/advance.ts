@@ -14,7 +14,7 @@ export default {
     toolsTitle: 'ツール設定',
     toolsDesc: 'AI が使えるツール（ウェブ検索など）を設定するよ',
     toolsButton: 'ツール設定画面へ',
-    ttsTitle: 'ローカル TTS',
+    ttsTitle: 'TTS 設定',
     ttsDesc: 'DeBERTa とキャラクター音声モデルをダウンロード・管理して、オフラインでローカル TTS エンジンを使用',
     ttsButton: 'ローカル TTS 画面へ',
     asrTitle: '音声認識',

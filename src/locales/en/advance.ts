@@ -15,7 +15,7 @@ export default {
     toolsTitle: "Tool Settings",
     toolsDesc: "Configure the tools AI can use, like web search (looking things up online)",
     toolsButton: "Open Tool Settings",
-    ttsTitle: "Local TTS",
+    ttsTitle: "TTS Settings",
     ttsDesc: "Download and manage DeBERTa and character voice models to use the local TTS engine offline",
     ttsButton: "Enter Local TTS",
     asrTitle: "Speech Recognition",
