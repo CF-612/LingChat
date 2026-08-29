@@ -37,17 +37,6 @@ fn service(app: &AppHandle) -> Result<CloudVoiceService> {
     Ok(CloudVoiceService::new(key))
 }
 
-fn read_models(app: &AppHandle) -> Vec<String> {
-    TtsConfig::load(app).cosyvoice_models
-}
-
-fn write_models(app: &AppHandle, models: Vec<String>) -> Result<()> {
-    let store = crate::config::settings_store(app)?;
-    store.set(keys::COSYVOICE_MODELS, serde_json::json!(models));
-    store.save()?;
-    Ok(())
-}
-
 fn read_voice_records(app: &AppHandle) -> Vec<CosyVoiceRecord> {
     TtsConfig::load(app).cosyvoice_voices
 }
@@ -76,27 +65,6 @@ pub async fn cosyvoice_save_api_key(app: AppHandle, api_key: String) -> Result<(
     let store = crate::config::settings_store(&app).map_err(|e| e.to_string())?;
     store.set(keys::COSYVOICE_API_KEY, serde_json::json!(api_key));
     store.save().map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn cosyvoice_add_model(app: AppHandle, model: String) -> Result<(), String> {
-    let model = model.trim().to_string();
-    if model.is_empty() {
-        return Err("模型名不能为空".into());
-    }
-    let mut models = read_models(&app);
-    if !models.contains(&model) {
-        models.push(model);
-        write_models(&app, models).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn cosyvoice_remove_model(app: AppHandle, model: String) -> Result<(), String> {
-    let mut models = read_models(&app);
-    models.retain(|m| *m != model);
-    write_models(&app, models).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

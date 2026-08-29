@@ -846,8 +846,6 @@ pub fn run() {
             ai_service::tts::local::tts_local_get_enabled,
             ai_service::tts::cloud::commands::cosyvoice_get_config,
             ai_service::tts::cloud::commands::cosyvoice_save_api_key,
-            ai_service::tts::cloud::commands::cosyvoice_add_model,
-            ai_service::tts::cloud::commands::cosyvoice_remove_model,
             ai_service::tts::cloud::commands::cosyvoice_create_voice,
             ai_service::tts::cloud::commands::cosyvoice_voice_status,
             ai_service::tts::cloud::commands::cosyvoice_list_voices,

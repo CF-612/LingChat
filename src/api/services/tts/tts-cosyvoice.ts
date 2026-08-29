@@ -31,14 +31,6 @@ export function saveApiKey(apiKey: string): Promise<void> {
   return invoke<void>('cosyvoice_save_api_key', { apiKey })
 }
 
-export function addModel(model: string): Promise<void> {
-  return invoke<void>('cosyvoice_add_model', { model })
-}
-
-export function removeModel(model: string): Promise<void> {
-  return invoke<void>('cosyvoice_remove_model', { model })
-}
-
 export async function createVoice(
   name: string,
   model: string,

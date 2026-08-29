@@ -994,7 +994,7 @@ export default {
     }
   },
   "tts": {
-    "title": "本地 TTS",
+    "title": "TTS 設置",
     "switch": {
       "label": "全域本地 TTS",
       "enabled": "已啟用",
@@ -1072,9 +1072,6 @@ export default {
       "keyConfigured": "API Key 已配置",
       "keyChange": "更換",
       "keySave": "儲存",
-      "modelLabel": "模型",
-      "modelAddPlaceholder": "輸入模型名（如 cosyvoice-v3.5-flash）",
-      "modelAdd": "添加",
       "voicesLabel": "我的音色（{count}）",
       "voicesEmpty": "未有音色，導入語音樣本建立第一個吧",
       "voiceStatus": "狀態：{status}",
@@ -1086,8 +1083,8 @@ export default {
       "previewVoice": "試聽",
       "deleteVoice": "刪除音色",
       "voiceNamePlaceholder": "音色名稱",
-      "voiceNameLabel": "音色名稱",
-      "languageLabel": "樣本語種",
+      "voiceNameLabel": "音色名稱（必填）",
+      "languageLabel": "參考音頻語言（必填）",
       "languages": {
         "zh": "中文",
         "en": "英語",
@@ -1108,11 +1105,27 @@ export default {
       "registering": "註冊中…",
       "previewTitle": "試聽",
       "previewSubtitle": "輸入內容並選擇已註冊嘅克隆音色",
+      "importTitle": "導入音色",
+      "importSubtitle": "上傳清晰人聲樣本，創建專屬克隆音色",
+      "importHint": "時長建議 10–20 秒，支援 wav / mp3，取樣率不低於 16kHz，所選參考音頻語言必須與實際音頻語言一致，單人清晰說話，無背景音樂或噪音",
       "previewPlaceholder": "輸入試聽文字…",
       "previewVoiceLabel": "音色",
       "previewSelect": "選擇音色",
       "generating": "生成中…",
-      "generate": "生成並播放"
+      "generate": "生成並播放",
+      "notices": {
+        "loadConfigFailed": "載入語音克隆配置失敗: {error}",
+        "keySaved": "CosyVoice API Key 已保存",
+        "keySaveFailed": "儲存 API Key 失敗: {error}",
+        "needNameAndSample": "請先輸入音色名稱並選擇語音樣本",
+        "voiceSubmitted": "音色已提交審核: {name}（{voiceId}），審核通過後即可使用",
+        "registerFailed": "音色註冊失敗: {error}",
+        "deleteConfirm": "確定刪除音色「{name}」嗎？雲端與本地記錄將一併移除。",
+        "deleteTitle": "刪除音色",
+        "deleteFailed": "刪除音色失敗: {error}",
+        "needPreviewText": "請輸入試聽文字",
+        "previewFailed": "試聽失敗: {error}"
+      },
     },
     "messages": {
       "readStatusFailed": "讀取本地 TTS 狀態失敗：{error}",
@@ -1135,7 +1148,9 @@ export default {
       "switchEnabled": "本地 TTS 已啟用。",
       "switchEnabledNotReady": "本地 TTS 已啟用，但引擎未就緒（缺少 DeBERTa 模型或分詞器，請先下載）。",
       "switchDisabled": "本地 TTS 已關閉，如需使用雲端 TTS，請將角色語音切換為「雲端」並重新啟動應用程式。",
-      "saveSwitchFailed": "儲存本地 TTS 開關失敗：{error}"
+      "saveSwitchFailed": "儲存本地 TTS 開關失敗：{error}",
+      "deviceSwitched": "推理設備已切換: {name}",
+      "deviceSwitchFailed": "切換推理設備失敗: {error}"
     }
   },
 

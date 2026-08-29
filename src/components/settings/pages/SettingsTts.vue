@@ -388,40 +388,6 @@
             </button>
           </div>
 
-          <!-- 模型管理 -->
-          <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
-            <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.modelLabel') }}</span>
-            <select
-              v-model="cosySelectedModel"
-              class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-              :disabled="!cosyKeyConfigured || cosyRegistering"
-            >
-              <option v-for="m in cosyModels" :key="m" :value="m" class="bg-slate-800">{{ m }}</option>
-            </select>
-            <input
-              v-model="cosyNewModel"
-              class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-52"
-              :placeholder="t('settings.tts.cosyvoice.modelAddPlaceholder')"
-              :disabled="!cosyKeyConfigured"
-            />
-            <button
-              class="inline-flex h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="!cosyKeyConfigured || !cosyNewModel.trim()"
-              @click="addCosyModel"
-            >
-              <Plus :size="16" />
-              <span>{{ t('settings.tts.cosyvoice.modelAdd') }}</span>
-            </button>
-            <button
-              v-if="cosySelectedModel"
-              class="inline-flex h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-red-400/50! enabled:hover:bg-red-400/10! enabled:hover:text-red-300! disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="!cosyKeyConfigured"
-              @click="removeCosyModel(cosySelectedModel)"
-            >
-              <Trash2 :size="16" />
-            </button>
-          </div>
-
           <!-- 我的音色 -->
           <div class="mb-4">
             <p class="mb-2 text-xs text-white/60">
@@ -477,61 +443,76 @@
             </div>
           </div>
 
-          <!-- 导入样本注册:第一行音色名称(独占),第二行语种/样本/注册 -->
-          <div class="mb-4 flex min-w-0 flex-col gap-2">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.voiceNameLabel') }}</span>
-              <input
-                v-model="cosyVoiceName"
-                class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-                maxlength="32"
-                :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
-                :disabled="!cosyKeyConfigured || cosyRegistering"
-              />
+          <!-- 导入音色(独立小节,与试听小节结构一致):音色名称独占一行,语种/样本/注册在下方 -->
+          <section class="mt-6 pt-6">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-semibold text-white">{{ t('settings.tts.cosyvoice.importTitle') }}</h3>
+                <p class="mt-0.5 text-xs text-white/45">{{ t('settings.tts.cosyvoice.importSubtitle') }}</p>
+              </div>
+              <FileAudio :size="18" class="text-white/40" />
             </div>
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-              <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
-              <select
-                v-model="cosyLang"
-                class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-                :disabled="!cosyKeyConfigured || cosyRegistering"
-              >
-                <option
-                  v-for="lang in COSYVOICE_LANGUAGES"
-                  :key="lang"
-                  :value="lang"
-                  class="bg-slate-800"
+
+            <div class="flex min-w-0 flex-col gap-2">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.voiceNameLabel') }}</span>
+                <input
+                  v-model="cosyVoiceName"
+                  class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                  maxlength="32"
+                  :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
+                  :disabled="!cosyKeyConfigured || cosyRegistering"
+                />
+              </div>
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
+                <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
+                <select
+                  v-model="cosyLang"
+                  class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                  :disabled="!cosyKeyConfigured || cosyRegistering"
                 >
-                  {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
-                </option>
-              </select>
-              <button
-                class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!cosyKeyConfigured || cosyRegistering"
-                @click="pickCosySample"
-              >
-                <FileArchive :size="17" />
-                <span>
-                  {{ cosySamplePath
-                    ? cosySamplePath.split(/[\\/]/).pop()
-                    : t('settings.tts.cosyvoice.pickSample') }}
-                </span>
-              </button>
-              <button
-                class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!cosyKeyConfigured || cosyRegistering || !cosySamplePath"
-                @click="registerCosyVoice()"
-              >
-                <LoaderCircle v-if="cosyRegistering" :size="16" class="animate-spin" />
-                <Mic2 v-else :size="16" />
-                <span>
-                  {{ cosyRegistering
-                    ? t('settings.tts.cosyvoice.registering')
-                    : t('settings.tts.cosyvoice.register') }}
-                </span>
-              </button>
+                  <option
+                    v-for="lang in COSYVOICE_LANGUAGES"
+                    :key="lang"
+                    :value="lang"
+                    class="bg-slate-800"
+                  >
+                    {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
+                  </option>
+                </select>
+                <button
+                  class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="!cosyKeyConfigured || cosyRegistering"
+                  @click="pickCosySample"
+                >
+                  <FileArchive :size="17" />
+                  <span>
+                    {{ cosySamplePath
+                      ? cosySamplePath.split(/[\\/]/).pop()
+                      : t('settings.tts.cosyvoice.pickSample') }}
+                  </span>
+                </button>
+                <button
+                  class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="!cosyKeyConfigured || cosyRegistering || !cosySamplePath"
+                  @click="registerCosyVoice()"
+                >
+                  <LoaderCircle v-if="cosyRegistering" :size="16" class="animate-spin" />
+                  <Mic2 v-else :size="16" />
+                  <span>
+                    {{ cosyRegistering
+                      ? t('settings.tts.cosyvoice.registering')
+                      : t('settings.tts.cosyvoice.register') }}
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
+
+            <!-- 导入音频要求提示(单行) -->
+            <p class="mt-3 border-l border-white/10 pl-3 text-xs leading-5 text-white/45">
+              {{ t('settings.tts.cosyvoice.importHint') }}
+            </p>
+          </section>
 
           <!-- 试听(独立小节,与内置 TTS 试听结构一致) -->
           <section class="mt-6 border-t border-white/10 pt-6">
@@ -602,6 +583,7 @@ import {
   Check,
   CircleAlert,
   FileArchive,
+  FileAudio,
   FileDown,
   FileJson,
   HardDriveDownload,
@@ -610,7 +592,6 @@ import {
   LoaderCircle,
   Mic2,
   Play,
-  Plus,
   RefreshCw,
   Trash2,
   Volume2,
@@ -662,8 +643,6 @@ const savingLocalTts = ref(false)
 const cosyKey = ref('')
 const cosyKeyConfigured = ref(false)
 const cosyModels = ref<string[]>([])
-const cosySelectedModel = ref('')
-const cosyNewModel = ref('')
 const cosyVoices = ref<TtsCosyvoice.CosyVoiceView[]>([])
 const cosyVoiceName = ref('')
 const cosyLang = ref('zh')
@@ -673,6 +652,13 @@ const cosyPreviewVoice = ref('')
 const cosyPreviewing = ref(false)
 // 样本语种(cosyvoice-v3.5-flash 的 language_hints 官方支持范围)
 const COSYVOICE_LANGUAGES = ['zh', 'en', 'ja', 'ko', 'fr', 'de', 'ru', 'pt', 'th', 'id', 'vi'] as const
+// 云端合成固定使用音色所属模型(注册模型必须与之一致);列表为空时回退官方默认
+const DEFAULT_COSYVOICE_MODEL = 'cosyvoice-v3.5-flash'
+
+function voiceModelOf(voiceId: string): string {
+  const voice = cosyVoices.value.find((v) => v.voice_id === voiceId)
+  return voice?.model || cosyModels.value[0] || DEFAULT_COSYVOICE_MODEL
+}
 // 审核状态轮询(参考 N.E.K.O.:5s 周期 + 在途/暂停去重 + 失败暂停手动重查)
 const statusPolling = new Set<string>()
 const statusPaused = new Set<string>()
@@ -776,11 +762,11 @@ async function saveInferenceDevice() {
     const dev = gpuDevices.value.find((d) => `device:${d.id}` === inferenceDevice.value)
     notice.value = {
       kind: 'success',
-      text: `推理设备已切换: ${dev ? dev.name : inferenceDevice.value}`,
+      text: t('settings.tts.messages.deviceSwitched', { name: dev ? dev.name : inferenceDevice.value }),
     }
   } catch (e) {
     console.error('切换推理设备失败:', e)
-    notice.value = { kind: 'error', text: `切换推理设备失败: ${e}` }
+    notice.value = { kind: 'error', text: t('settings.tts.messages.deviceSwitchFailed', { error: errorText(e) }) }
     // 失败时回滚下拉显示
     inferenceDevice.value = 'cpu'
   } finally {
@@ -1153,9 +1139,6 @@ async function loadCosyvoice(): Promise<void> {
     const cfg = await TtsCosyvoice.getConfig()
     cosyKeyConfigured.value = cfg.api_key_configured
     cosyModels.value = cfg.models
-    if (!cosySelectedModel.value || !cfg.models.includes(cosySelectedModel.value)) {
-      cosySelectedModel.value = cfg.models[0] ?? ''
-    }
     const voices = await TtsCosyvoice.listVoices()
     cosyVoices.value = voices
     if (
@@ -1165,7 +1148,7 @@ async function loadCosyvoice(): Promise<void> {
       cosyPreviewVoice.value = voices[0]?.voice_id ?? ''
     }
   } catch (e) {
-    notice.value = { kind: 'error', text: `加载语音克隆配置失败: ${errorText(e)}` }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.loadConfigFailed', { error: errorText(e) }) }
   }
 }
 
@@ -1176,39 +1159,18 @@ async function saveCosyKey(): Promise<void> {
     await TtsCosyvoice.saveApiKey(key)
     cosyKey.value = ''
     cosyKeyConfigured.value = true
-    notice.value = { kind: 'success', text: 'CosyVoice API Key 已保存' }
+    notice.value = { kind: 'success', text: t('settings.tts.cosyvoice.notices.keySaved') }
     await loadCosyvoice()
   } catch (e) {
-    notice.value = { kind: 'error', text: `保存 API Key 失败: ${errorText(e)}` }
-  }
-}
-
-async function addCosyModel(): Promise<void> {
-  const model = cosyNewModel.value.trim()
-  if (!model) return
-  try {
-    await TtsCosyvoice.addModel(model)
-    cosyNewModel.value = ''
-    await loadCosyvoice()
-  } catch (e) {
-    notice.value = { kind: 'error', text: `添加模型失败: ${errorText(e)}` }
-  }
-}
-
-async function removeCosyModel(model: string): Promise<void> {
-  try {
-    await TtsCosyvoice.removeModel(model)
-    await loadCosyvoice()
-  } catch (e) {
-    notice.value = { kind: 'error', text: `删除模型失败: ${errorText(e)}` }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.keySaveFailed', { error: errorText(e) }) }
   }
 }
 
 async function pickCosySample(): Promise<void> {
   // Android 上 plugin-dialog 的 extensions 字段是 MIME 类型(非扩展名),需特判
   const filters = /android/i.test(navigator.userAgent)
-    ? [{ name: 'Audio sample', extensions: ['audio/wav', 'audio/mpeg', 'audio/flac', 'audio/mp4'] }]
-    : [{ name: 'Audio sample', extensions: ['wav', 'mp3', 'flac', 'm4a'] }]
+    ? [{ name: 'Audio sample', extensions: ['audio/wav', 'audio/mpeg', 'audio/flac'] }]
+    : [{ name: 'Audio sample', extensions: ['wav', 'mp3', 'flac'] }]
   const selection = await open({ multiple: false, filters })
   const path = selectedPath(selection)
   if (path) cosySamplePath.value = path
@@ -1217,7 +1179,7 @@ async function pickCosySample(): Promise<void> {
 async function registerCosyVoice(): Promise<void> {
   const name = cosyVoiceName.value.trim()
   if (!name || !cosySamplePath.value) {
-    notice.value = { kind: 'error', text: '请先输入音色名称并选择语音样本' }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.needNameAndSample') }
     return
   }
   cosyRegistering.value = true
@@ -1225,7 +1187,7 @@ async function registerCosyVoice(): Promise<void> {
   try {
     const record = await TtsCosyvoice.createVoice(
       name,
-      cosySelectedModel.value,
+      cosyModels.value[0] || DEFAULT_COSYVOICE_MODEL,
       cosySamplePath.value,
       cosyLang.value,
       (phase) => {
@@ -1234,14 +1196,14 @@ async function registerCosyVoice(): Promise<void> {
     )
     notice.value = {
       kind: 'success',
-      text: `音色已提交审核: ${record.name}（${record.voice_id}），审核通过后即可使用`,
+      text: t('settings.tts.cosyvoice.notices.voiceSubmitted', { name: record.name, voiceId: record.voice_id }),
     }
     cosyVoiceName.value = ''
     cosySamplePath.value = ''
     await loadCosyvoice()
     startStatusPolling()
   } catch (e) {
-    notice.value = { kind: 'error', text: `音色注册失败: ${errorText(e)}` }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.registerFailed', { error: errorText(e) }) }
   } finally {
     cosyRegistering.value = false
   }
@@ -1249,43 +1211,32 @@ async function registerCosyVoice(): Promise<void> {
 
 async function removeCosyVoice(voice: TtsCosyvoice.CosyVoiceView): Promise<void> {
   const confirmed = await dialogStore.confirm(
-    `确定删除音色「${voice.name}」吗？云端与本地记录将一并移除。`,
-    '删除音色',
+    t('settings.tts.cosyvoice.notices.deleteConfirm', { name: voice.name }),
+    t('settings.tts.cosyvoice.notices.deleteTitle'),
   )
   if (!confirmed) return
   try {
     await TtsCosyvoice.deleteVoice(voice.voice_id)
     await loadCosyvoice()
   } catch (e) {
-    notice.value = { kind: 'error', text: `删除音色失败: ${errorText(e)}` }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.deleteFailed', { error: errorText(e) }) }
   }
 }
 
-// 音色卡片的试听:用音色自己所属的模型合成(合成模型必须与注册模型一致,否则云端报错)
+// 音色卡片的试听:合成模型取音色自己所属的模型(必须与注册模型一致,否则云端报错)
 async function previewVoiceFrom(voice: TtsCosyvoice.CosyVoiceView): Promise<void> {
-  if (voice.model && cosyModels.value.includes(voice.model)) {
-    cosySelectedModel.value = voice.model
-  }
   cosyPreviewVoice.value = voice.voice_id
   await runCosyPreview()
 }
 
-// 试听区音色下拉:选中音色后自动同步其所属模型,避免不匹配组合
-watch(cosyPreviewVoice, (voiceId) => {
-  const voice = cosyVoices.value.find((v) => v.voice_id === voiceId)
-  if (voice?.model && cosyModels.value.includes(voice.model)) {
-    cosySelectedModel.value = voice.model
-  }
-})
-
 async function runCosyPreview(): Promise<void> {
-  if (!cosySelectedModel.value || !cosyPreviewVoice.value) return
+  if (!cosyPreviewVoice.value) return
   if (!previewText.value.trim()) {
-    notice.value = { kind: 'error', text: '请输入试听文本' }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.needPreviewText') }
     return
   }
   console.log('[cosyvoice] 试听开始', {
-    model: cosySelectedModel.value,
+    model: voiceModelOf(cosyPreviewVoice.value),
     voiceId: cosyPreviewVoice.value,
     textLen: previewText.value.trim().length,
   })
@@ -1293,7 +1244,7 @@ async function runCosyPreview(): Promise<void> {
   notice.value = null
   try {
     const bytes = await TtsCosyvoice.synthesizePreview(
-      cosySelectedModel.value,
+      voiceModelOf(cosyPreviewVoice.value),
       cosyPreviewVoice.value,
       previewText.value.trim(),
     )
@@ -1316,7 +1267,7 @@ async function runCosyPreview(): Promise<void> {
     }
   } catch (e) {
     console.error('[cosyvoice] 试听失败', e)
-    notice.value = { kind: 'error', text: `试听失败: ${errorText(e)}` }
+    notice.value = { kind: 'error', text: t('settings.tts.cosyvoice.notices.previewFailed', { error: errorText(e) }) }
   } finally {
     cosyPreviewing.value = false
   }
