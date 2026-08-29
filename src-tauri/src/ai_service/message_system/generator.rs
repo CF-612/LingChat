@@ -712,6 +712,10 @@ fn tts_translation_language(tts_type: &str, voice_lang: &str) -> Option<&'static
         ("indextts2", "es") => Some("es"),
         ("indextts2", "ar") => Some("ar"),
         ("gsv" | "opentts", "ko") => Some("ko"),
+        // CosyVoice 多语言自动检测：voice_lang 为英文/韩语时先翻译成目标语言再合成，
+        // 否则会朗读主模型默认附带的日文译文（japanese_text）
+        ("cosyvoice", "en") => Some("en"),
+        ("cosyvoice", "ko") => Some("ko"),
         _ => None,
     }
 }
