@@ -1,5 +1,6 @@
 //! CosyVoice 云端音色服务：注册（含本地文件上传）/查询/列表/删除。
 
+pub mod commands;
 pub mod enrollment;
 #[cfg(test)]
 pub mod enrollment_test;
