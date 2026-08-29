@@ -261,6 +261,7 @@ import { useDialogStore } from '../../../stores/modules/ui/dialog'
 import { useGameStore } from '@/stores/modules/game'
 import { useUIStore } from '@/stores/modules/ui/ui'
 import * as TtsLocal from '../../../api/services/tts/tts-local'
+import * as TtsCosyvoice from '../../../api/services/tts/tts-cosyvoice'
 
 const props = defineProps<{
   visible: boolean
@@ -280,6 +281,7 @@ const uiStore = useUIStore()
 const gameStore = useGameStore()
 const localSettings = ref<any>({})
 const installedVoices = ref<TtsLocal.VoiceRecord[]>([])
+const cloudVoices = ref<TtsCosyvoice.CosyVoiceView[]>([])
 
 // 删除按钮可用性：系统保护角色 / 在场角色不可删
 const deleteState = computed(() => {
@@ -342,6 +344,15 @@ async function refreshLocalVoices(): Promise<void> {
   }
 }
 
+async function refreshCloudVoices(): Promise<void> {
+  try {
+    cloudVoices.value = await TtsCosyvoice.listVoices()
+  } catch (error) {
+    console.warn('refreshCloudVoices failed', error)
+    cloudVoices.value = []
+  }
+}
+
 const tabs = computed(() => [
   { id: 'basic', label: t('settings.characterInfo.tabs.basic') },
   { id: 'prompts', label: t('settings.characterInfo.tabs.prompts') },
@@ -366,6 +377,7 @@ const voiceModelKeys = [
   'aivis_model_uuid',
   'opentts_voice',
   'fish_s2_voice',
+  'cosyvoice_voice_id',
 ] as const
 
 // --- Schema Definition ---
@@ -447,6 +459,7 @@ const schemas = computed<Record<string, FieldSchema[]>>(() => ({
         { label: t('settings.characterInfo.fields.fishS2'), value: 'fishs2' },
         { label: t('settings.characterInfo.fields.localSbv2Api'), value: 'localsbv2api' },
         { label: 'indextts2', value: 'indextts2' },
+        { label: t('settings.characterInfo.fields.voiceCloneTts'), value: 'cosyvoice' },
       ],
     },
 
@@ -462,12 +475,15 @@ const schemas = computed<Record<string, FieldSchema[]>>(() => ({
         {
           label: t('settings.characterInfo.voiceLangOptions.en'),
           value: 'en',
-          visibleIf: (s) => ['gsv', 'opentts', 'sbv2', 'sbv2api', 'indextts2', 'fishs2'].includes(s.tts_type),
+          visibleIf: (s) =>
+            ['gsv', 'opentts', 'sbv2', 'sbv2api', 'indextts2', 'fishs2', 'cosyvoice'].includes(
+              s.tts_type,
+            ),
         },
         {
           label: t('settings.characterInfo.voiceLangOptions.ko'),
           value: 'ko',
-          visibleIf: (s) => ['gsv', 'opentts'].includes(s.tts_type),
+          visibleIf: (s) => ['gsv', 'opentts', 'cosyvoice'].includes(s.tts_type),
         },
         {
           label: t('settings.characterInfo.voiceLangOptions.es'),
@@ -591,6 +607,23 @@ const schemas = computed<Record<string, FieldSchema[]>>(() => ({
       realtime: true,
       placeholder: t('settings.characterInfo.placeholders.fishS2Voice'),
       visibleIf: (s) => s.tts_type === 'fishs2',
+    },
+
+    // --- 云端语音克隆 (cosyvoice) ---
+    {
+      key: 'cosyvoice_voice_id',
+      parent: 'voice_models',
+      label: t('settings.characterInfo.fields.cosyVoiceVoice'),
+      type: 'select',
+      realtime: true,
+      dynamicOptions: () =>
+        cloudVoices.value.length === 0
+          ? [{ label: t('settings.characterInfo.fields.noCloudVoice'), value: '' }]
+          : cloudVoices.value.map((voice) => ({
+              label: voice.name ? `${voice.name} (${voice.voice_id})` : voice.voice_id,
+              value: voice.voice_id,
+            })),
+      visibleIf: (s) => s.tts_type === 'cosyvoice',
     },
 
     // --- Local SBV2 (localsbv2api) ---
@@ -795,6 +828,7 @@ watch(
   ([visible, tab, ttsType]) => {
     if (visible && tab === 'voice' && ttsType === 'localsbv2api') {
       void refreshLocalVoices()
+      void refreshCloudVoices()
     }
   },
 )
