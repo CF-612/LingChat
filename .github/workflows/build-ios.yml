@@ -18,16 +18,8 @@ jobs:
     env:
       # workflow_dispatch 的 compression 输入 → 脚本内 data.7z 压缩等级（默认 9）
       IOS_BUNDLED_7Z_LEVEL: ${{ github.event.inputs.compression }}
-      # 移动端构建必须启用：让 webview 从应用内嵌资产加载前端
-      # （tauri CLI 会在 iOS 构建时自动附加 custom-protocol feature）
-      CARGO_PROFILE_RELEASE_OPT_LEVEL: 's'
-      CARGO_PROFILE_RELEASE_STRIP: 'true'
-      # pnpm 11 在 Xcode 的 Build Rust Code 脚本（无 TTY）里会做依赖校验并触发
-      # 自动 pnpm install，模块目录需清空时直接中止（ERR_PNPM_ABORTED_..._NO_TTY）。
-      # 用 pnpm_config_ 前缀的环境变量关闭（.npmrc 中的同名键会被 pnpm 11 过滤）。
-      pnpm_config_verify_deps_before_run: 'false'
-      pnpm_config_confirm_modules_purge: 'false'
-      CI: 'true'
+      # 其余构建环境（CI / pnpm_config_* / CARGO_PROFILE_RELEASE_*）由
+      # build-ios-unsigned.sh 内置设置（与本地流程单一事实来源）。
 
     steps:
       - uses: actions/checkout@v4

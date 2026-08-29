@@ -18,13 +18,20 @@
 # ============================================================================
 set -euo pipefail
 
-# pnpm 11 的 verify-deps-before-run 在无 TTY 环境下（脚本/CI 触发、Xcode
-# Build Rust Code 阶段）会因模块目录需要清空重装而直接中止
-# （ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY）。与 build-ios.yml 的 job env
-# 保持一致：显式关闭依赖校验与清理确认（.npmrc 中的同名键会被 pnpm 11 过滤）。
+# 构建环境与 CI（build-ios.yml）保持完全一致（单一事实来源），确保本地与
+# GitHub Actions 产出等价 IPA：
+# - CI=true + pnpm_config_*：pnpm 11 的 verify-deps-before-run 在无 TTY 环境下
+#   （脚本/CI 触发、Xcode Build Rust Code 阶段）会因模块目录需要清空重装而直接
+#   中止（ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY）；.npmrc 中的同名键会被
+#   pnpm 11 过滤，因此用环境变量。
+# - CARGO_PROFILE_RELEASE_*：等价于 [profile.release] opt-level="s" + strip=true
+#   （项目 Cargo.toml 未覆盖 release profile，CI 由此控制；原先本地未设置，
+#   会得到未 strip 的 opt-level=3 二进制，IPA 偏大）。
 export CI=true
 export pnpm_config_verify_deps_before_run=false
 export pnpm_config_confirm_modules_purge=false
+export CARGO_PROFILE_RELEASE_OPT_LEVEL=s
+export CARGO_PROFILE_RELEASE_STRIP=true
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"

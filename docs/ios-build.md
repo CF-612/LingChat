@@ -70,9 +70,17 @@ pnpm tauri ios build --no-sign             # 3. 构建（beforeBuildCommand 自�
 
 `.github/workflows/build-ios.yml`（手动触发）在 `macos-latest` 上执行同一流程，
 IPA 作为 workflow artifact 上传（保留 7 天）。构建步骤直接复用
-`pnpm run ios:build`（`build-ios-unsigned.sh`），与本地流程单一事实来源，
-workflow 的 `compression` 输入通过 `IOS_BUNDLED_7Z_LEVEL` 环境变量透传给
+`pnpm run ios:build`（`build-ios-unsigned.sh`），与本地流程单一事实来源；
+构建相关环境变量（`CI` / `pnpm_config_*` / `CARGO_PROFILE_RELEASE_*`）由脚本
+内置设置，workflow 的 `compression` 输入通过 `IOS_BUNDLED_7Z_LEVEL` 透传给
 `prepare-bundled-resources.mjs`（默认 9）。
+
+**本地与 CI 产出的等价性**：流程、依赖锁、资源清单（`data.7z` 按 git ls-files）、
+图标与前端构建（同一 commit + 同一 lockfile）均一致，IPA 可互换使用。已知且
+**无法消除**的非确定性：构建时间戳/UUID、Rust 与 Xcode 工具链版本（CI 的
+`rust-toolchain@stable` 与 `macos-latest` 会滚动更新）、以及 Apple 对
+Assets.car/签名的重编码。**注意**：本地工作区如有未提交的 `data/` 改动，会被
+`prepare-bundled-resources.mjs` 打进本地 IPA（CI 只打包 commit 内容）。
 
 ## 侧载安装
 
