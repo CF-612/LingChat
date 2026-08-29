@@ -826,8 +826,12 @@ watch(
 watch(
   () => [props.visible, activeTab.value, localSettings.value.tts_type],
   ([visible, tab, ttsType]) => {
-    if (visible && tab === 'voice' && ttsType === 'localsbv2api') {
-      void refreshLocalVoices()
+    if (visible && tab === 'voice') {
+      // 本地 TTS 音色:仅 localsbv2api 需要
+      if (ttsType === 'localsbv2api') {
+        void refreshLocalVoices()
+      }
+      // 云端音色:cosyvoice 下拉随时需要（与 tts_type 无关）
       void refreshCloudVoices()
     }
   },
