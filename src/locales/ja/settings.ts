@@ -1106,6 +1106,8 @@ export default {
       register: 'インポートして登録',
 
       registering: '登録中…',
+      previewTitle: '試聴',
+      previewSubtitle: 'テキストを入力し、登録済みのクローン音声を選択',
       previewPlaceholder: '試聴テキストを入力…',
       previewVoiceLabel: '音声',
       previewSelect: '音声を選択',

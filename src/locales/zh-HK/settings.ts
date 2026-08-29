@@ -1106,6 +1106,8 @@ export default {
       "register": "匯入並註冊音色",
 
       "registering": "註冊中…",
+      "previewTitle": "試聽",
+      "previewSubtitle": "輸入內容並選擇已註冊嘅克隆音色",
       "previewPlaceholder": "輸入試聽文字…",
       "previewVoiceLabel": "音色",
       "previewSelect": "選擇音色",

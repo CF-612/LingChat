@@ -1108,6 +1108,8 @@ export default {
       register: 'Import & register voice',
 
       registering: 'Registering…',
+      previewTitle: 'Preview',
+      previewSubtitle: 'Enter text and select a registered cloned voice',
       previewPlaceholder: 'Enter text to preview…',
       previewVoiceLabel: 'Voice',
       previewSelect: 'Select voice',

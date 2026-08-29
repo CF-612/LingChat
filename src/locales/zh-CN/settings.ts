@@ -1112,6 +1112,8 @@ export default {
       register: '导入并注册音色',
 
       registering: '注册中…',
+      previewTitle: '试听',
+      previewSubtitle: '输入内容并选择已注册的克隆音色',
       previewPlaceholder: '输入试听文本…',
       previewVoiceLabel: '音色',
       previewSelect: '选择音色',

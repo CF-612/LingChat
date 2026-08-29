@@ -533,48 +533,58 @@
             </div>
           </div>
 
-          <!-- 试听 -->
-          <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
-            <textarea
-              v-model="previewText"
-              class="min-h-28 w-full resize-y rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-              maxlength="500"
-              :placeholder="t('settings.tts.cosyvoice.previewPlaceholder')"
-              :disabled="!cosyKeyConfigured"
-            ></textarea>
-            <label class="flex flex-col gap-1.5 text-xs text-white/60">
-              <span>{{ t('settings.tts.cosyvoice.previewVoiceLabel') }}</span>
-              <select
-                v-model="cosyPreviewVoice"
-                class="h-9 w-full rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+          <!-- 试听(独立小节,与内置 TTS 试听结构一致) -->
+          <section class="mt-6 border-t border-white/10 pt-6">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-semibold text-white">{{ t('settings.tts.cosyvoice.previewTitle') }}</h3>
+                <p class="mt-0.5 text-xs text-white/45">{{ t('settings.tts.cosyvoice.previewSubtitle') }}</p>
+              </div>
+              <Volume2 :size="18" class="text-white/40" />
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
+              <textarea
+                v-model="previewText"
+                class="min-h-28 w-full resize-y rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                maxlength="500"
+                :placeholder="t('settings.tts.cosyvoice.previewPlaceholder')"
                 :disabled="!cosyKeyConfigured"
-              >
-                <option value="">{{ t('settings.tts.cosyvoice.previewSelect') }}</option>
-                <option
-                  v-for="voice in cosyVoices"
-                  :key="voice.voice_id"
-                  :value="voice.voice_id"
-                  class="bg-slate-800"
+              ></textarea>
+              <label class="flex flex-col gap-1.5 text-xs text-white/60">
+                <span>{{ t('settings.tts.cosyvoice.previewVoiceLabel') }}</span>
+                <select
+                  v-model="cosyPreviewVoice"
+                  class="h-9 w-full rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                  :disabled="!cosyKeyConfigured"
                 >
-                  {{ voice.name }}
-                </option>
-              </select>
-            </label>
-          </div>
-          <div class="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              class="inline-flex min-h-9 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="!cosyKeyConfigured || !cosyPreviewVoice || cosyPreviewing"
-              @click="runCosyPreview"
-            >
-              <LoaderCircle v-if="cosyPreviewing" :size="16" class="animate-spin" />
-              <Play v-else :size="16" />
-              {{ cosyPreviewing
-                ? t('settings.tts.cosyvoice.generating')
-                : t('settings.tts.cosyvoice.generate') }}
-            </button>
-            <audio ref="cosyAudioRef" controls class="h-9 min-w-0 flex-1" />
-          </div>
+                  <option value="">{{ t('settings.tts.cosyvoice.previewSelect') }}</option>
+                  <option
+                    v-for="voice in cosyVoices"
+                    :key="voice.voice_id"
+                    :value="voice.voice_id"
+                    class="bg-slate-800"
+                  >
+                    {{ voice.name }}
+                  </option>
+                </select>
+              </label>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                class="inline-flex min-h-9 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!cosyKeyConfigured || !cosyPreviewVoice || cosyPreviewing"
+                @click="runCosyPreview"
+              >
+                <LoaderCircle v-if="cosyPreviewing" :size="16" class="animate-spin" />
+                <Play v-else :size="16" />
+                {{ cosyPreviewing
+                  ? t('settings.tts.cosyvoice.generating')
+                  : t('settings.tts.cosyvoice.generate') }}
+              </button>
+              <audio ref="cosyAudioRef" controls class="h-9 min-w-0 flex-1" />
+            </div>
+          </section>
         </section>
       </div>
     </MenuItem>
