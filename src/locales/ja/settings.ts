@@ -1102,10 +1102,9 @@ export default {
         vi: 'ベトナム語',
       },
       pickSample: '音声サンプルを選択',
-      urlModeTitle: '公開 URL で登録する',
-      urlPlaceholder: '公開アクセス可能な音声 URL を入力（https://…）',
+
       register: 'インポートして登録',
-      registerUrl: '音声を登録',
+
       registering: '登録中…',
       previewPlaceholder: '試聴テキストを入力…',
       previewVoiceLabel: '音声',

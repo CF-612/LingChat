@@ -477,77 +477,60 @@
             </div>
           </div>
 
-          <!-- 导入样本注册 -->
-          <div class="mb-4 flex min-w-0 flex-wrap items-center gap-2">
-            <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.voiceNameLabel') }}</span>
-            <input
-              v-model="cosyVoiceName"
-              class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45 sm:max-w-44"
-              maxlength="32"
-              :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
-              :disabled="!cosyKeyConfigured || cosyRegistering"
-            />
-            <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
-            <select
-              v-model="cosyLang"
-              class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-              :disabled="!cosyKeyConfigured || cosyRegistering"
-            >
-              <option
-                v-for="lang in COSYVOICE_LANGUAGES"
-                :key="lang"
-                :value="lang"
-                class="bg-slate-800"
+          <!-- 导入样本注册:第一行音色名称(独占),第二行语种/样本/注册 -->
+          <div class="mb-4 flex min-w-0 flex-col gap-2">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.voiceNameLabel') }}</span>
+              <input
+                v-model="cosyVoiceName"
+                class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                maxlength="32"
+                :placeholder="t('settings.tts.cosyvoice.voiceNamePlaceholder')"
+                :disabled="!cosyKeyConfigured || cosyRegistering"
+              />
+            </div>
+            <div class="flex min-w-0 flex-wrap items-center gap-2">
+              <span class="shrink-0 text-xs text-white/60">{{ t('settings.tts.cosyvoice.languageLabel') }}</span>
+              <select
+                v-model="cosyLang"
+                class="h-9 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
+                :disabled="!cosyKeyConfigured || cosyRegistering"
               >
-                {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
-              </option>
-            </select>
-            <button
-              v-if="!cosyUrlMode"
-              class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="!cosyKeyConfigured || cosyRegistering"
-              @click="pickCosySample"
-            >
-              <FileArchive :size="17" />
-              <span>
-                {{ cosySamplePath
-                  ? cosySamplePath.split(/[\\/]/).pop()
-                  : t('settings.tts.cosyvoice.pickSample') }}
-              </span>
-            </button>
-            <input
-              v-if="cosyUrlMode"
-              v-model="cosyUrl"
-              class="h-9 w-full min-w-0 flex-1 rounded-md border border-white/15 bg-black/25 px-2.5 py-2 text-[13px] text-white outline-none transition-colors focus:border-cyan-300/65 disabled:cursor-not-allowed disabled:opacity-45"
-              :placeholder="t('settings.tts.cosyvoice.urlPlaceholder')"
-              :disabled="!cosyKeyConfigured || cosyRegistering"
-            />
-            <button
-              v-if="!cosyUrlMode"
-              class="inline-flex h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="!cosyKeyConfigured || cosyRegistering"
-              :title="t('settings.tts.cosyvoice.urlModeTitle')"
-              @click="cosyUrlMode = true"
-            >
-              <Link :size="16" />
-            </button>
-            <button
-              class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="
-                !cosyKeyConfigured ||
-                cosyRegistering ||
-                (cosyUrlMode ? !cosyUrl.trim() : !cosySamplePath)
-              "
-              @click="cosyUrlMode ? registerCosyVoiceFromUrl() : registerCosyVoice()"
-            >
-              <LoaderCircle v-if="cosyRegistering" :size="16" class="animate-spin" />
-              <Mic2 v-else :size="16" />
-              <span>
-                {{ cosyRegistering
-                  ? t('settings.tts.cosyvoice.registering')
-                  : (cosyUrlMode ? t('settings.tts.cosyvoice.registerUrl') : t('settings.tts.cosyvoice.register')) }}
-              </span>
-            </button>
+                <option
+                  v-for="lang in COSYVOICE_LANGUAGES"
+                  :key="lang"
+                  :value="lang"
+                  class="bg-slate-800"
+                >
+                  {{ t(`settings.tts.cosyvoice.languages.${lang}`) }}
+                </option>
+              </select>
+              <button
+                class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white/80 transition-colors duration-200 enabled:hover:border-cyan-300/40 enabled:hover:bg-cyan-300/10 enabled:hover:text-cyan-50 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!cosyKeyConfigured || cosyRegistering"
+                @click="pickCosySample"
+              >
+                <FileArchive :size="17" />
+                <span>
+                  {{ cosySamplePath
+                    ? cosySamplePath.split(/[\\/]/).pop()
+                    : t('settings.tts.cosyvoice.pickSample') }}
+                </span>
+              </button>
+              <button
+                class="inline-flex min-h-9 shrink-0 items-center justify-center gap-[7px] rounded-md border border-cyan-300/40 bg-cyan-600/35 px-3.5 py-2 text-[13px] font-semibold text-cyan-50 transition-colors duration-200 enabled:hover:bg-cyan-600/50 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!cosyKeyConfigured || cosyRegistering || !cosySamplePath"
+                @click="registerCosyVoice()"
+              >
+                <LoaderCircle v-if="cosyRegistering" :size="16" class="animate-spin" />
+                <Mic2 v-else :size="16" />
+                <span>
+                  {{ cosyRegistering
+                    ? t('settings.tts.cosyvoice.registering')
+                    : t('settings.tts.cosyvoice.register') }}
+                </span>
+              </button>
+            </div>
           </div>
 
           <!-- 试听 -->
@@ -613,7 +596,6 @@ import {
   FileJson,
   HardDriveDownload,
   KeyRound,
-  Link,
   ListMusic,
   LoaderCircle,
   Mic2,
@@ -677,8 +659,6 @@ const cosyVoiceName = ref('')
 const cosyLang = ref('zh')
 const cosySamplePath = ref('')
 const cosyRegistering = ref(false)
-const cosyUrlMode = ref(false)
-const cosyUrl = ref('')
 const cosyPreviewVoice = ref('')
 const cosyPreviewing = ref(false)
 // 样本语种(cosyvoice-v3.5-flash 的 language_hints 官方支持范围)
@@ -1248,40 +1228,6 @@ async function registerCosyVoice(): Promise<void> {
     }
     cosyVoiceName.value = ''
     cosySamplePath.value = ''
-    await loadCosyvoice()
-    startStatusPolling()
-  } catch (e) {
-    notice.value = {
-      kind: 'error',
-      text: `音色注册失败: ${errorText(e)}。可尝试改用公网 URL 注册。`,
-    }
-  } finally {
-    cosyRegistering.value = false
-  }
-}
-
-async function registerCosyVoiceFromUrl(): Promise<void> {
-  const name = cosyVoiceName.value.trim()
-  const url = cosyUrl.value.trim()
-  if (!name || !url) {
-    notice.value = { kind: 'error', text: '请先输入音色名称与公网音频 URL' }
-    return
-  }
-  cosyRegistering.value = true
-  notice.value = null
-  try {
-    const record = await TtsCosyvoice.createVoiceFromUrl(
-      name,
-      cosySelectedModel.value,
-      url,
-      cosyLang.value,
-    )
-    notice.value = {
-      kind: 'success',
-      text: `音色已提交审核: ${record.name}，审核通过后即可使用`,
-    }
-    cosyVoiceName.value = ''
-    cosyUrl.value = ''
     await loadCosyvoice()
     startStatusPolling()
   } catch (e) {

@@ -1102,10 +1102,9 @@ export default {
         "vi": "越南語"
       },
       "pickSample": "選擇語音樣本",
-      "urlModeTitle": "改用公開網址註冊",
-      "urlPlaceholder": "輸入公開可存取嘅音訊網址（https://…）",
+
       "register": "匯入並註冊音色",
-      "registerUrl": "註冊音色",
+
       "registering": "註冊中…",
       "previewPlaceholder": "輸入試聽文字…",
       "previewVoiceLabel": "音色",

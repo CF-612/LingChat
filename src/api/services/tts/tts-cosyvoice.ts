@@ -57,15 +57,6 @@ export async function createVoice(
   })
 }
 
-export function createVoiceFromUrl(
-  name: string,
-  model: string,
-  url: string,
-  language: string,
-): Promise<CosyVoiceRecord> {
-  return invoke<CosyVoiceRecord>('cosyvoice_create_voice_from_url', { name, model, url, language })
-}
-
 export function listVoices(): Promise<CosyVoiceView[]> {
   return invoke<CosyVoiceView[]>('cosyvoice_list_voices')
 }

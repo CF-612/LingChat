@@ -1104,10 +1104,9 @@ export default {
         vi: 'Vietnamese',
       },
       pickSample: 'Choose audio sample',
-      urlModeTitle: 'Register via public URL instead',
-      urlPlaceholder: 'Enter a publicly accessible audio URL (https://…)',
+
       register: 'Import & register voice',
-      registerUrl: 'Register voice',
+
       registering: 'Registering…',
       previewPlaceholder: 'Enter text to preview…',
       previewVoiceLabel: 'Voice',

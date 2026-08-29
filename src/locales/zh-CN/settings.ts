@@ -1108,10 +1108,9 @@ export default {
         vi: '越南语',
       },
       pickSample: '选择语音样本',
-      urlModeTitle: '改用公网 URL 注册',
-      urlPlaceholder: '输入公网可访问的音频 URL（https://…）',
+
       register: '导入并注册音色',
-      registerUrl: '注册音色',
+
       registering: '注册中…',
       previewPlaceholder: '输入试听文本…',
       previewVoiceLabel: '音色',

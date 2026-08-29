@@ -149,24 +149,6 @@ pub async fn cosyvoice_create_voice(
     result
 }
 
-#[tauri::command]
-pub async fn cosyvoice_create_voice_from_url(
-    app: AppHandle,
-    name: String,
-    model: String,
-    url: String,
-    language: String,
-) -> Result<CosyVoiceRecord, String> {
-    let language = if language.trim().is_empty() { "zh" } else { language.trim() };
-    let svc = service(&app).map_err(|e| e.to_string())?;
-    let record = svc
-        .submit_from_url(&model, &name, &url, language)
-        .await
-        .map_err(|e| e.to_string())?;
-    upsert_voice_record(&app, &record).map_err(|e| e.to_string())?;
-    Ok(record)
-}
-
 /// 查询单音色审核状态（小写），结果写回本地缓存；未注册过该音色也照常查询。
 #[tauri::command]
 pub async fn cosyvoice_voice_status(

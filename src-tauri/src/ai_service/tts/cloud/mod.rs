@@ -91,40 +91,6 @@ impl CloudVoiceService {
         })
     }
 
-    /// 公网 URL 注册（兜底路径）：create_voice → 立即返回。
-    pub async fn submit_from_url(
-        &self,
-        model: &str,
-        name: &str,
-        url: &str,
-        language: &str,
-    ) -> Result<CosyVoiceRecord> {
-        let prefix = sanitize_prefix(name);
-        let voice_id = create_voice(
-            &self.api_key,
-            model,
-            &prefix,
-            url,
-            Some(&[language]),
-        )
-        .await?;
-        tracing::info!(
-            "CosyVoice 音色已提交审核(URL): model={} prefix={} name={} lang={} voice_id={}",
-            model,
-            prefix,
-            name,
-            language,
-            voice_id
-        );
-        Ok(CosyVoiceRecord {
-            voice_id,
-            name: name.to_string(),
-            model: model.to_string(),
-            created_at: Some(unix_seconds_str()),
-            status: Some("deploying".to_string()),
-        })
-    }
-
     /// 查询单音色审核状态（小写：ok / undeployed / deploying…）。
     pub async fn status(&self, voice_id: &str) -> Result<String> {
         let status = query_voice(&self.api_key, voice_id).await?;
