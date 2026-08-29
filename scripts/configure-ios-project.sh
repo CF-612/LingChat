@@ -83,7 +83,23 @@ else
   echo "[configure-ios] Build Rust Code phase: no 'pnpm tauri' prefix found (already patched or not pnpm-wrapped)"
 fi
 
-# --- 5. Show the patched shell script for verification -----------------------
+# --- 5. Sync AppIcon from src-tauri/icons/ios --------------------------------
+# gen/apple 是本地持久产物（gitignored），configure 时若已存在会跳过 init，
+# 图标可能停留在旧版本（Android 每次都由 tauri icon 按 icon.png 重新生成）。
+# 这里把 src-tauri/icons/ios/（tauri icon 的输出，与 Android 同源 icon.png）
+# 同步到 Xcode 工程的 AppIcon.appiconset，保证 iOS 图标与 Android 一致。
+
+IOS_ICON_SRC="src-tauri/icons/ios"
+APPICON_DIR="$GEN_APPLE/Assets.xcassets/AppIcon.appiconset"
+if [ -d "$IOS_ICON_SRC" ] && [ -d "$APPICON_DIR" ]; then
+  cp "$IOS_ICON_SRC"/AppIcon-*.png "$APPICON_DIR/"
+  echo "[configure-ios] AppIcon synced from $IOS_ICON_SRC (same source as Android)"
+else
+  echo "[configure-ios] WARNING: AppIcon dirs missing (src=$IOS_ICON_SRC dst=$APPICON_DIR);" \
+    "run 'pnpm run init' first (generates src-tauri/icons/ios via 'tauri icon')" >&2
+fi
+
+# --- 6. Show the patched shell script for verification -----------------------
 
 echo "[configure-ios] Build Rust Code shellScript (first 220 chars):"
 grep -o 'shellScript = ".*' "$PBXPROJ" | head -3 | cut -c1-220 || true

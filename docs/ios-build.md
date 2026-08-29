@@ -14,6 +14,12 @@
 - Xcode 工程由 `tauri ios init` 生成（XcodeGen），目标**兼容 iPhone 与 iPad**
   （`TARGETED_DEVICE_FAMILY = "1,2"`，XcodeGen 默认即此值，`scripts/configure-ios-project.sh`
   会显式归一化兜底）。
+- **App 图标与 Android 同源**：`configure-ios-project.sh` 每次配置时把
+  `src-tauri/icons/ios/`（`tauri icon` 基于 `src-tauri/icons/icon.png` 生成，与
+  Android 使用的源图相同）同步到 Xcode 工程 `Assets.xcassets/AppIcon.appiconset/`。
+  `gen/apple` 是本地持久产物（gitignored），工程已存在时会跳过 `ios init`，
+  不同步图标会停留在旧版本（实测曾出现 iOS 显示旧版 logo、Android 显示新版蓝猫
+  图标的不一致）。若同步时提示目录缺失，先执行 `pnpm run init` 生成图标。
 - 截图插件（`tauri-plugin-screenshots`）依赖的 `xcap` 不支持 iOS，已在插件内打桩：
   iOS 构建时排除 xcap，所有截图命令返回「不支持」错误（`screenshots:default`
   权限仍可正常解析，capabilities 无需改动）。
