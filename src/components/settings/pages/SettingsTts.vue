@@ -970,6 +970,16 @@ async function removeDeberta(): Promise<void> {
   }
 }
 
+// Tauri invoke 返回 Vec<u8> 的三种形态:ArrayBuffer(自定义协议 Raw 路径)/
+// Uint8Array / number[](postMessage fallback 序列化成 JSON 数组)。
+// 统一归一化成 ArrayBuffer 才能正确构造 Blob——直接 Blob([number[]]) 会被
+// String() 成逗号字符串,播放必然失败。
+function toAudioBuffer(bytes: Uint8Array | ArrayBuffer | number[]): ArrayBuffer {
+  if (bytes instanceof ArrayBuffer) return bytes
+  if (ArrayBuffer.isView(bytes)) return bytes.buffer
+  return new Uint8Array(bytes).buffer
+}
+
 async function runPreview(): Promise<void> {
   if (!canPreview.value) return
   previewing.value = true
@@ -982,7 +992,7 @@ async function runPreview(): Promise<void> {
       sdpRatio: previewSdp.value,
     })
     if (audioUrl) URL.revokeObjectURL(audioUrl)
-    audioUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
+    audioUrl = URL.createObjectURL(new Blob([toAudioBuffer(bytes)], { type: 'audio/wav' }))
     await nextTick()
     if (audioRef.value) {
       audioRef.value.src = audioUrl
@@ -1329,9 +1339,12 @@ async function runCosyPreview(): Promise<void> {
       cosyPreviewVoice.value,
       previewText.value.trim(),
     )
-    console.log('[cosyvoice] 合成返回', bytes.byteLength, 'bytes')
+    console.log('[cosyvoice] 合成返回', bytes?.byteLength ?? 'unknown', 'bytes, type:', Object.prototype.toString.call(bytes))
+    // 统一归一化成 ArrayBuffer(见 toAudioBuffer 注释),否则 Blob 内容会变成逗号字符串
+    const audioBuffer = toAudioBuffer(bytes)
+    console.log('[cosyvoice] Blob 字节数', audioBuffer.byteLength)
     if (audioUrl) URL.revokeObjectURL(audioUrl)
-    audioUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }))
+    audioUrl = URL.createObjectURL(new Blob([audioBuffer], { type: 'audio/wav' }))
     await nextTick()
     if (audioRef.value) {
       audioRef.value.src = audioUrl
