@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full flex items-center justify-between relative px-5 py-2">
+  <div class="w-full h-full flex items-center justify-between relative px-5 pt-safe pb-2">
     <img src="@/assets/images/LingChatLogo.png" alt="Logo" class="w-20 ml-5 hidden xl:block" />
     <nav
       ref="navContainer"

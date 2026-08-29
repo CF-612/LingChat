@@ -1,7 +1,7 @@
 <template>
   <StartList>
     <StartLine v-for="(script, index) in currentPageScripts">
-      <StartItem
+      <StartItem class="menu-subitem"
         :key="script.script_name"
         @click="selectScript(script)"
       >
@@ -10,7 +10,7 @@
     </StartLine>
 
     <StartLine>
-      <StartItem
+      <StartItem class="menu-subitem"
         v-for="n in pageSize - currentPageScripts.length"
         :key="'placeholder-' + n"
         disabled="true"
@@ -20,19 +20,19 @@
     </StartLine>
     <!-- 分页控制 -->
     <StartLine>
-      <StartItem
+      <StartItem class="menu-subitem"
         @click="currentPage--"
         :disabled="currentPage === 1"
       >
         <
       </StartItem>
-      <StartItem
+      <StartItem class="menu-subitem"
         disabled="true"
         style="font-size: 28px"
       >
         {{ currentPage }} / {{ totalPages }}
       </StartItem>
-      <StartItem
+      <StartItem class="menu-subitem"
         @click="currentPage++"
         :disabled="currentPage === totalPages"
       >

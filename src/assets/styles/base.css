@@ -38,6 +38,12 @@
 .pt-safe-gap { padding-top: calc(8px + var(--safe-area-inset-top)); }
 .pb-safe-gap { padding-bottom: calc(8px + var(--safe-area-inset-bottom)); }
 
+/* 输入控件字号下限 16px：阻止 iOS 聚焦时对 <16px 输入框的自动缩放（页面放大一下） */
+input,
+textarea {
+  font-size: max(16px, 1em);
+}
+
 @keyframes spin {
   0% {
     transform: rotate(0deg);

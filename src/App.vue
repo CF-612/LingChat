@@ -73,6 +73,99 @@ void getImportedFonts().then((fonts) => {
 
 const route = useRoute()
 
+// ─── iOS 键盘适配：仿 Android 实现（MainActivity 注入 --safe-area-inset-*） ─────
+// Android：WebView 不随键盘改变布局，而是把键盘/系统 bars 高度作为
+//   --safe-area-inset-bottom 注入 CSS 变量，UI 用 var() 自行让位，页面永不滚动。
+// iOS 照搬同一模式：
+//   1. 键盘/配件条高度并入 --safe-area-inset-bottom（存在 .pb-safe/pb-safe-gap、
+//      对话框 padding、MusicPlayer 等 var() 用法，自动上移让位）
+//   2. 硬锁滚动：任何 scroll 事件立即归零，页面不可上下滑动（与 Android 一致）
+const vv = window.visualViewport
+// 基准底部安全区（无键盘时的 env 值，首个值即基线）
+let safeBaseBottom = 0
+let safeBaseInitialized = false
+// 当前已施加的抬升量（几何解算用自然位置 = 当前底部 + 已抬升量，避免自引用震荡）
+let currentLift = 0
+// 键盘状态兜底轮询：外部/配件键盘等场景 vv 事件偶发不触发，
+// 轮询 vv.height 变化触发重算（800ms 一次，开销可忽略）
+let kbGuardTimer: ReturnType<typeof setInterval> | null = null
+let lastKbSig = 0
+
+const lockScroll = () => {
+  window.scrollTo(0, 0)
+  if (document.documentElement.scrollTop) document.documentElement.scrollTop = 0
+  if (document.body.scrollTop) document.body.scrollTop = 0
+}
+
+// 页面级平移拦截（iOS 键盘收起后剩余的可滚动区）：根级 touchmove 直接 preventDefault，
+// 内部滚动容器（聊天记录/设置页等 overflow-y-auto/custom-scroll）不受影响
+const preventRootTouchScroll = (e: TouchEvent) => {
+  const t = e.target as HTMLElement | null
+  if (
+    t &&
+    t.closest(
+      '.overflow-y-auto, .overflow-auto, .custom-scroll, .scrollbar-thin, [data-scrollable]',
+    )
+  ) {
+    return
+  }
+  e.preventDefault()
+}
+
+const syncVisualViewport = () => {
+  if (!vv) return
+  const root = document.documentElement
+  if (!safeBaseInitialized) {
+    // 初始同步：读取当前 env() 解析值作为基线（iOS: 34px 左右；桌面 0）
+    const cur = parseFloat(getComputedStyle(root).getPropertyValue('--safe-area-inset-bottom')) || 0
+    safeBaseBottom = Number.isFinite(cur) ? cur : 0
+    safeBaseInitialized = true
+  }
+
+  // iPad 检测：现代 iPadOS 为桌面版 UA（MacIntel + 多点触控）
+  const isIPad =
+    navigator.userAgent.includes('iPad') ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+  // 键盘可见高度 = 取两种来源的最大值：
+  //   - env(keyboard-inset-height)：iPad 悬浮小键盘/常规键盘上报的可见高度（iOS 16.4+）
+  //   - vv 高度差：iPhone 软键盘、配件条等
+  let kbd = 0
+  try {
+    const envKbd = parseFloat(
+      getComputedStyle(root).getPropertyValue('keyboard-inset-height'),
+    )
+    if (Number.isFinite(envKbd)) kbd = Math.max(kbd, envKbd)
+  } catch {
+    /* env 不可读时忽略 */
+  }
+  kbd = Math.max(kbd, window.innerHeight - vv.height)
+
+  // 键盘可见区顶部（可见区高度 = min(vv.height, 窗口 - 键盘高度)）
+  const visibleHeight = Math.min(vv.height, window.innerHeight - kbd)
+
+  // 不让位的情形：无键盘；或 iPad 悬浮小键盘（可拖动，挡到输入框用户会自行移开）
+  if (kbd <= 20 || (isIPad && kbd < 200)) {
+    currentLift = 0
+  } else {
+    // 几何解算让位：以「聚焦输入框自然底部 + 间距」相对键盘上方可见区的高度差为准。
+    // 自然位置 = 当前底部 + 已施加抬升量（移除抬升影响），公式稳定不震荡。
+    const ae = document.activeElement as HTMLElement | null
+    if (ae && typeof ae.getBoundingClientRect === 'function') {
+      const r = ae.getBoundingClientRect()
+      const naturalBottom = r.bottom + currentLift
+      if (naturalBottom - 16 > visibleHeight) {
+        currentLift = Math.max(0, Math.round(naturalBottom - 16 - visibleHeight))
+      }
+    }
+  }
+  // 仿 Android：底部安全区 = 基线 + 抬升量
+  root.style.setProperty('--safe-area-inset-bottom', `${safeBaseBottom + currentLift}px`)
+
+  // 页面始终锚定原点（键盘弹出的系统 focus-scroll 与手势滚动都会被锁回）
+  lockScroll()
+}
+
 // 仅主窗口挂载全局弹窗（通知/成就/对话确认），日志窗口等复用 App.vue 的窗口不弹
 const isMainWindow = getCurrentWindow().label === 'main'
 
@@ -144,6 +237,45 @@ onMounted(async () => {
   // 注册 F11 全屏快捷键
   window.addEventListener('keydown', handleKeyDown)
 
+  // ─── iOS 键盘：视觉视口收缩时同步布局视口 ──────────────────────
+  // WKWebView 固定布局下聚焦输入框弹出键盘时，布局视口不会自动收缩，
+  // 页面（874 高）比可视区高 → 整个 webview 可上下滑动、输入框被键盘盖住。
+  // 这里把 documentElement 高度跟随 visualViewport（键盘弹出=可视区高度），
+  // 配合 index.html 的 interactive-widget=resizes-content 双保险；
+  // 桌面 visualViewport == window，同步为无操作。
+  if (vv) {
+    vv.addEventListener('resize', syncVisualViewport)
+    vv.addEventListener('scroll', syncVisualViewport)
+  }
+  window.addEventListener('orientationchange', syncVisualViewport)
+  // 硬锁滚动：任何滚动（键盘 focus-scroll / 手势）立即归零
+  window.addEventListener('scroll', lockScroll, { passive: true, capture: true })
+  document.addEventListener('touchmove', preventRootTouchScroll, { passive: false })
+  // 聚焦变化 → 重算让位（focusin 先清 0 由 vv resize 收敛，focusout 归零）
+  document.addEventListener('focusin', syncVisualViewport, true)
+  document.addEventListener('focusout', syncVisualViewport, true)
+  if (vv) {
+    kbGuardTimer = setInterval(() => {
+      let envKbd = 0
+      try {
+        envKbd =
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              'keyboard-inset-height',
+            ),
+          ) || 0
+      } catch {
+        /* ignore */
+      }
+      const sig = Math.round(vv.height) * 1000 + Math.round(envKbd)
+      if (sig !== lastKbSig) {
+        lastKbSig = sig
+        syncVisualViewport()
+      }
+    }, 800)
+  }
+  lockScroll()
+
   // ─── 关闭确认逻辑 ──────────────────────────────────────────
 
   // 1. 监听 Rust 存档完成事件
@@ -179,6 +311,19 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('orientationchange', syncVisualViewport)
+  window.removeEventListener('scroll', lockScroll, { capture: true } as any)
+  document.removeEventListener('touchmove', preventRootTouchScroll)
+  document.removeEventListener('focusin', syncVisualViewport, true)
+  document.removeEventListener('focusout', syncVisualViewport, true)
+  if (kbGuardTimer) {
+    clearInterval(kbGuardTimer)
+    kbGuardTimer = null
+  }
+  if (vv) {
+    vv.removeEventListener('resize', syncVisualViewport)
+    vv.removeEventListener('scroll', syncVisualViewport)
+  }
   if (unlistenCloseReady) unlistenCloseReady()
   if (unlistenCloseRequested) unlistenCloseRequested()
 })
@@ -205,7 +350,14 @@ html {
 }
 
 #app {
-  width: 100vw;
-  height: 100vh;
+  /* 视口口径统一为动态视口（dvw/dvh，iOS 全屏态下 dvw 横屏自动排除左右安全区、dvh 竖屏含上下安全区）：
+     #app 铺满整个视觉视口（含状态栏/Home 指示器区域），使各屏壁纸全出血显示；
+     安全区内缩由各边缘元素通过 env(safe-area-inset-*)（桌面/Android 桌面为 0px，零回归）自行处理——
+     已在全局提供 --safe-area-inset-* 变量与 .pt-safe/.pb-safe 工具类（见 base.css）。 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100dvw;
+  height: 100dvh;
 }
 </style>
