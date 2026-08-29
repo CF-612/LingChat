@@ -17,9 +17,22 @@ use crate::config::tts::CosyVoiceRecord;
 pub use enrollment::*;
 pub use upload::*;
 
-/// 注册音色统一使用的前缀（官方要求仅数字字母 ≤10 字符）。
+/// 音色名 sanitize 成 ASCII 字母数字前缀（官方要求仅数字字母 ≤10 字符）；
+/// 中文等不可转写字符会被滤掉，全滤空时回退 "voice"。
 /// voice_id 格式：{target_model}-{prefix}-{唯一标识}。
-pub const VOICE_PREFIX: &str = "myvoice";
+fn sanitize_prefix(name: &str) -> String {
+    let out: String = name
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(10)
+        .collect::<String>()
+        .to_lowercase();
+    if out.is_empty() {
+        "voice".to_string()
+    } else {
+        out
+    }
+}
 
 /// 云端音色服务：注册（自动上传/URL 兜底）+ 轮询 + 列表 + 删除。
 #[derive(Debug, Clone)]
@@ -44,19 +57,30 @@ impl CloudVoiceService {
         file_path: &Path,
         progress: impl Fn(&str),
     ) -> Result<CosyVoiceRecord> {
+        let prefix = sanitize_prefix(name);
         progress("上传语音样本中…");
         let url = upload_audio(&self.api_key, model, file_path).await?;
         progress("提交复刻任务…");
-        let voice_id =
-            create_voice(&self.api_key, model, VOICE_PREFIX, &url, Some(&["zh"])).await?;
+        tracing::info!(
+            "CosyVoice 创建音色: model={} prefix={} name={}",
+            model,
+            prefix,
+            name
+        );
+        let voice_id = create_voice(&self.api_key, model, &prefix, &url, Some(&["zh"])).await?;
         progress("音色处理中（约需几十秒）…");
         poll_until_ready(
-            &mut |voice_id: String| async move { query_voice(&self.api_key, &voice_id).await },
+            &mut |voice_id: String| async move {
+                let status = query_voice(&self.api_key, &voice_id).await?;
+                tracing::debug!("CosyVoice 音色状态轮询: {voice_id} -> {status}");
+                Ok(status)
+            },
             voice_id.clone(),
             30,
             Duration::from_secs(10),
         )
         .await?;
+        tracing::info!("CosyVoice 音色就绪: {}", voice_id);
         Ok(CosyVoiceRecord {
             voice_id,
             name: name.to_string(),
@@ -67,15 +91,26 @@ impl CloudVoiceService {
 
     /// 公网 URL 注册（兜底路径）。
     pub async fn create_from_url(&self, model: &str, name: &str, url: &str) -> Result<CosyVoiceRecord> {
-        let voice_id =
-            create_voice(&self.api_key, model, VOICE_PREFIX, url, Some(&["zh"])).await?;
+        let prefix = sanitize_prefix(name);
+        tracing::info!(
+            "CosyVoice 创建音色(URL): model={} prefix={} name={}",
+            model,
+            prefix,
+            name
+        );
+        let voice_id = create_voice(&self.api_key, model, &prefix, url, Some(&["zh"])).await?;
         poll_until_ready(
-            &mut |voice_id: String| async move { query_voice(&self.api_key, &voice_id).await },
+            &mut |voice_id: String| async move {
+                let status = query_voice(&self.api_key, &voice_id).await?;
+                tracing::debug!("CosyVoice 音色状态轮询: {voice_id} -> {status}");
+                Ok(status)
+            },
             voice_id.clone(),
             30,
             Duration::from_secs(10),
         )
         .await?;
+        tracing::info!("CosyVoice 音色就绪: {}", voice_id);
         Ok(CosyVoiceRecord {
             voice_id,
             name: name.to_string(),
@@ -84,9 +119,9 @@ impl CloudVoiceService {
         })
     }
 
-    /// 云端音色列表（带状态）。
+    /// 云端音色列表（带状态）。不带 prefix 过滤——音色名各异，全部拉取再合并本地映射。
     pub async fn list(&self) -> Result<Vec<VoiceListItem>> {
-        let ids = list_voices(&self.api_key, VOICE_PREFIX).await?;
+        let ids = list_voices(&self.api_key, None).await?;
         // 逐个查询状态（数量通常个位数）；查询失败不致命，标记为 None
         let mut items = Vec::new();
         for id in ids {
@@ -198,5 +233,22 @@ mod tests {
             poll_until_ready(&mut query, "v1".into(), 30, std::time::Duration::from_millis(1))
                 .await;
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn sanitize_prefix_ascii_alnum_lowercased() {
+        assert_eq!(sanitize_prefix("NuoYi123"), "nuoyi123");
+    }
+
+    #[test]
+    fn sanitize_prefix_truncates_at_10() {
+        assert_eq!(sanitize_prefix("abcdefghijklmnop"), "abcdefghij");
+    }
+
+    #[test]
+    fn sanitize_prefix_filters_non_ascii() {
+        assert_eq!(sanitize_prefix("诺一_One"), "one");
+        assert_eq!(sanitize_prefix("诺一"), "voice");
+        assert_eq!(sanitize_prefix(""), "voice");
     }
 }

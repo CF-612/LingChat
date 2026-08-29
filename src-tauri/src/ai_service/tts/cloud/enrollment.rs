@@ -100,13 +100,14 @@ pub async fn query_voice(api_key: &str, voice_id: &str) -> Result<String> {
     parse_voice_status(&resp)
 }
 
-pub async fn list_voices(api_key: &str, prefix: &str) -> Result<Vec<String>> {
+pub async fn list_voices(api_key: &str, prefix: Option<&str>) -> Result<Vec<String>> {
+    let mut input = json!({"action": "list_voice", "page_size": 100});
+    if let Some(p) = prefix.filter(|p| !p.trim().is_empty()) {
+        input["prefix"] = json!(p);
+    }
     let resp = post_customization(
         api_key,
-        json!({
-            "model": "voice-enrollment",
-            "input": {"action": "list_voice", "prefix": prefix, "page_size": 100}
-        }),
+        json!({"model": "voice-enrollment", "input": input}),
     )
     .await?;
     parse_voice_list(&resp)

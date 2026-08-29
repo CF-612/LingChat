@@ -109,9 +109,19 @@ pub async fn cosyvoice_create_voice(
     file_path: String,
     channel: tauri::ipc::Channel<CosyvoiceProgress>,
 ) -> Result<CosyVoiceRecord, String> {
+    // 上传大小限制 20MB（与参考实现一致）
+    const MAX_SAMPLE_BYTES: u64 = 20 * 1024 * 1024;
+    let path = PathBuf::from(file_path);
+    let meta = std::fs::metadata(&path).map_err(|e| format!("读取语音样本失败: {e}"))?;
+    if meta.len() > MAX_SAMPLE_BYTES {
+        return Err(format!(
+            "语音样本超过 20MB 限制（当前 {:.1}MB）",
+            meta.len() as f64 / (1024.0 * 1024.0)
+        ));
+    }
     let svc = service(&app).map_err(|e| e.to_string())?;
     let record = svc
-        .create_from_file(&model, &name, &PathBuf::from(file_path), &|phase: &str| {
+        .create_from_file(&model, &name, &path, &|phase: &str| {
             let _ = channel.send(CosyvoiceProgress {
                 phase: phase.to_string(),
             });

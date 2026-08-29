@@ -1,7 +1,9 @@
-//! 本地音频上传到 DashScope 临时存储（48h 有效），换取 oss:// 临时 URL。
+//! 本地音频上传到 DashScope 临时存储（免费、48h 有效、与模型绑定），换取 oss:// 临时 URL。
 //!
-//! 流程：POST /api/v1/uploads?action=getPolicy 取凭证 → multipart 直传 OSS → 拼 oss://key。
-//! 注意：getPolicy 响应字段名以实际为准；实现遇解析失败时打印完整响应便于排查。
+//! 流程（参考已验证实现）：
+//! ① GET /api/v1/uploads?action=getPolicy&model=... 取 OSS 上传凭证
+//! ② multipart 直传 {upload_host}，key = {upload_dir}/{uuid8位}-{原文件名}（uuid 前缀防同名覆盖）
+//! ③ 返回 oss://{key}，供 create_voice 的 url 字段使用（需 X-DashScope-OssResourceResolve 头）
 
 use std::path::Path;
 
@@ -13,44 +15,40 @@ use crate::ai_service::tts::adapters::http_client;
 const BASE_URL: &str = "https://dashscope.aliyuncs.com/api/v1";
 const UPLOADS_PATH: &str = "/uploads";
 
-/// getPolicy 响应中的字段（字段名以实际响应为准，此处为官方示例中的常见字段）。
+/// getPolicy 响应字段（字段名来自已验证实现，与官方 Python SDK 一致）。
 struct UploadPolicy {
-    host: String,
+    upload_host: String,
     upload_dir: String,
     policy: String,
-    access_id: String,
+    oss_access_key_id: String,
     signature: String,
+    x_oss_object_acl: String,
+    x_oss_forbid_overwrite: String,
 }
 
 fn parse_policy(data: &Value) -> Result<UploadPolicy> {
+    let required = |key: &str| -> Result<String> {
+        data[key]
+            .as_str()
+            .map(str::to_string)
+            .ok_or_else(|| anyhow!("getPolicy 响应缺少 {key}: {data}"))
+    };
     Ok(UploadPolicy {
-        host: data["host"]
-            .as_str()
-            .unwrap_or("https://oss-cn-beijing.aliyuncs.com")
-            .to_string(),
-        upload_dir: data["upload_dir"]
-            .as_str()
-            .ok_or_else(|| anyhow!("getPolicy 缺少 upload_dir: {data}"))?
-            .to_string(),
-        policy: data["policy"]
-            .as_str()
-            .ok_or_else(|| anyhow!("getPolicy 缺少 policy: {data}"))?
-            .to_string(),
-        access_id: data["access_id"]
-            .as_str()
-            .ok_or_else(|| anyhow!("getPolicy 缺少 access_id: {data}"))?
-            .to_string(),
-        signature: data["signature"]
-            .as_str()
-            .ok_or_else(|| anyhow!("getPolicy 缺少 signature: {data}"))?
-            .to_string(),
+        upload_host: required("upload_host")?,
+        upload_dir: required("upload_dir")?,
+        policy: required("policy")?,
+        oss_access_key_id: required("oss_access_key_id")?,
+        signature: required("signature")?,
+        x_oss_object_acl: required("x_oss_object_acl")?,
+        x_oss_forbid_overwrite: required("x_oss_forbid_overwrite")?,
     })
 }
 
 /// 上传本地音频，返回 oss:// 形式临时 URL。
 pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Result<String> {
+    // ① 拿 OSS 上传凭证
     let resp = http_client()
-        .post(format!("{BASE_URL}{UPLOADS_PATH}"))
+        .get(format!("{BASE_URL}{UPLOADS_PATH}"))
         .query(&[("action", "getPolicy"), ("model", model)])
         .bearer_auth(api_key)
         .send()
@@ -62,22 +60,35 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
     }
     let v: Value = resp.json().await?;
     let policy = parse_policy(&v["data"])?;
+    tracing::info!("CosyVoice 上传凭证已获取: upload_dir={}", policy.upload_dir);
 
+    // ② 直传 OSS 临时空间
     let file_name = file_path
         .file_name()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "sample.wav".to_string());
-    let key = format!("{}/{}", policy.upload_dir, file_name);
+    // uuid 前 8 位前缀防同名文件覆盖（同一 upload_dir 下已有同名 key 会静默覆盖）
+    let uuid_prefix = &uuid::Uuid::new_v4().simple().to_string()[..8];
+    let key = format!("{}/{}-{}", policy.upload_dir, uuid_prefix, file_name);
+    tracing::debug!("CosyVoice OSS 直传: host={} key={}", policy.upload_host, key);
 
     let bytes = tokio::fs::read(file_path)
         .await
         .map_err(|e| anyhow!("读取音频文件失败: {e}"))?;
+    tracing::info!(
+        "CosyVoice 上传样本: {} ({} bytes)",
+        file_name,
+        bytes.len()
+    );
 
     let form = reqwest::multipart::Form::new()
-        .text("key", key.clone())
-        .text("policy", policy.policy.clone())
-        .text("OSSAccessKeyId", policy.access_id.clone())
+        .text("OSSAccessKeyId", policy.oss_access_key_id.clone())
         .text("signature", policy.signature.clone())
+        .text("policy", policy.policy.clone())
+        .text("x_oss_object_acl", policy.x_oss_object_acl.clone())
+        .text("x_oss_forbid_overwrite", policy.x_oss_forbid_overwrite.clone())
+        .text("key", key.clone())
+        .text("success_action_status", "200")
         .part(
             "file",
             reqwest::multipart::Part::bytes(bytes)
@@ -86,7 +97,7 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
         );
 
     let upload_resp = http_client()
-        .post(policy.host.clone())
+        .post(policy.upload_host.clone())
         .multipart(form)
         .send()
         .await?;
@@ -95,6 +106,6 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
         let text = upload_resp.text().await.unwrap_or_default();
         return Err(anyhow!("OSS 直传失败: HTTP {status}: {text}"));
     }
-
+    tracing::info!("CosyVoice 样本上传成功: oss://{key}");
     Ok(format!("oss://{}", key))
 }
