@@ -1,7 +1,5 @@
 //! CosyVoice 相关 Tauri commands。
 
-use std::path::PathBuf;
-
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
@@ -110,28 +108,45 @@ pub async fn cosyvoice_create_voice(
     language: String,
     channel: tauri::ipc::Channel<CosyvoiceProgress>,
 ) -> Result<CosyVoiceRecord, String> {
-    // 上传大小限制 20MB（与参考实现一致）
-    const MAX_SAMPLE_BYTES: u64 = 20 * 1024 * 1024;
-    let path = PathBuf::from(file_path);
-    let meta = std::fs::metadata(&path).map_err(|e| format!("读取语音样本失败: {e}"))?;
-    if meta.len() > MAX_SAMPLE_BYTES {
-        return Err(format!(
-            "语音样本超过 20MB 限制（当前 {:.1}MB）",
-            meta.len() as f64 / (1024.0 * 1024.0)
-        ));
+    // Android 上 dialog 返回 content:// URI,需先经 SAF bridge 复制到本地 cache
+    //（桌面端原样返回路径;staged 文件用完必须删除）
+    let source = crate::ai_service::tts::local::saf_bridge::prepare_file_import_source(
+        &app, &file_path,
+    )
+    .await
+    .map_err(|e| format!("读取语音样本失败: {e}"))?;
+    let path = source.path;
+
+    let result = async {
+        // 上传大小限制 20MB（与参考实现一致）
+        const MAX_SAMPLE_BYTES: u64 = 20 * 1024 * 1024;
+        let meta = std::fs::metadata(&path).map_err(|e| format!("读取语音样本失败: {e}"))?;
+        if meta.len() > MAX_SAMPLE_BYTES {
+            return Err(format!(
+                "语音样本超过 20MB 限制（当前 {:.1}MB）",
+                meta.len() as f64 / (1024.0 * 1024.0)
+            ));
+        }
+        let language = if language.trim().is_empty() { "zh" } else { language.trim() };
+        let svc = service(&app).map_err(|e| e.to_string())?;
+        let record = svc
+            .submit_from_file(&model, &name, &path, language, &|phase: &str| {
+                let _ = channel.send(CosyvoiceProgress {
+                    phase: phase.to_string(),
+                });
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+        upsert_voice_record(&app, &record).map_err(|e| e.to_string())?;
+        Ok(record)
     }
-    let language = if language.trim().is_empty() { "zh" } else { language.trim() };
-    let svc = service(&app).map_err(|e| e.to_string())?;
-    let record = svc
-        .submit_from_file(&model, &name, &path, language, &|phase: &str| {
-            let _ = channel.send(CosyvoiceProgress {
-                phase: phase.to_string(),
-            });
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-    upsert_voice_record(&app, &record).map_err(|e| e.to_string())?;
-    Ok(record)
+    .await;
+
+    // SAF staged 文件无论成功失败都要清理
+    if source.cleanup_after_import {
+        let _ = tokio::fs::remove_file(&path).await;
+    }
+    result
 }
 
 #[tauri::command]

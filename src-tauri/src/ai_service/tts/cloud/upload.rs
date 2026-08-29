@@ -55,8 +55,11 @@ pub async fn upload_audio(api_key: &str, model: &str, file_path: &Path) -> Resul
         .await?;
     if !resp.status().is_success() {
         let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("获取上传凭证失败: HTTP {status}: {text}"));
+        let body: Value = resp.json().await.unwrap_or_default();
+        let body_str = body.to_string();
+        let code = body["code"].as_str().unwrap_or("HTTP_ERROR");
+        let message = body["message"].as_str().unwrap_or(&body_str);
+        return Err(anyhow!("获取上传凭证失败: {code}: {message} (HTTP {status})"));
     }
     let v: Value = resp.json().await?;
     let policy = parse_policy(&v["data"])?;

@@ -590,7 +590,7 @@
                 ? t('settings.tts.cosyvoice.generating')
                 : t('settings.tts.cosyvoice.generate') }}
             </button>
-            <audio ref="audioRef" controls class="h-9 min-w-0 flex-1" />
+            <audio ref="cosyAudioRef" controls class="h-9 min-w-0 flex-1" />
           </div>
         </section>
       </div>
@@ -658,6 +658,9 @@ const previewSdp = ref(0)
 const previewing = ref(false)
 const audioRef = ref<HTMLAudioElement | null>(null)
 let audioUrl: string | null = null
+// cosyvoice 试听独立 audio 元素/URL（与本地 TTS 试听分开，避免同名 ref 互相覆盖）
+const cosyAudioRef = ref<HTMLAudioElement | null>(null)
+let cosyAudioUrl: string | null = null
 const progressByAsset = ref<Record<string, number>>({})
 const downloadError = ref<Record<string, string>>({})
 const downloadingId = ref<string | null>(null)
@@ -1144,6 +1147,7 @@ onUnmounted(() => {
   componentMounted = false
   stopStatusPolling()
   if (audioUrl) URL.revokeObjectURL(audioUrl)
+  if (cosyAudioUrl) URL.revokeObjectURL(cosyAudioUrl)
   unlistenProgress?.()
   unlistenProgress = null
   unlistenInstallComplete?.()
@@ -1211,10 +1215,11 @@ async function removeCosyModel(model: string): Promise<void> {
 }
 
 async function pickCosySample(): Promise<void> {
-  const selection = await open({
-    multiple: false,
-    filters: [{ name: 'Audio sample', extensions: ['wav', 'mp3', 'flac', 'm4a'] }],
-  })
+  // Android 上 plugin-dialog 的 extensions 字段是 MIME 类型(非扩展名),需特判
+  const filters = /android/i.test(navigator.userAgent)
+    ? [{ name: 'Audio sample', extensions: ['audio/wav', 'audio/mpeg', 'audio/flac', 'audio/mp4'] }]
+    : [{ name: 'Audio sample', extensions: ['wav', 'mp3', 'flac', 'm4a'] }]
+  const selection = await open({ multiple: false, filters })
   const path = selectedPath(selection)
   if (path) cosySamplePath.value = path
 }
@@ -1340,14 +1345,14 @@ async function runCosyPreview(): Promise<void> {
     // 统一归一化成 ArrayBuffer(见 toAudioBuffer 注释),否则 Blob 内容会变成逗号字符串
     const audioBuffer = toAudioBuffer(bytes)
     console.log('[cosyvoice] Blob 字节数', audioBuffer.byteLength)
-    if (audioUrl) URL.revokeObjectURL(audioUrl)
-    audioUrl = URL.createObjectURL(new Blob([audioBuffer], { type: 'audio/wav' }))
+    if (cosyAudioUrl) URL.revokeObjectURL(cosyAudioUrl)
+    cosyAudioUrl = URL.createObjectURL(new Blob([audioBuffer], { type: 'audio/wav' }))
     await nextTick()
-    if (audioRef.value) {
-      audioRef.value.src = audioUrl
+    if (cosyAudioRef.value) {
+      cosyAudioRef.value.src = cosyAudioUrl
       try {
-        await audioRef.value.play()
-        console.log('[cosyvoice] 播放中', audioUrl)
+        await cosyAudioRef.value.play()
+        console.log('[cosyvoice] 播放中', cosyAudioUrl)
       } catch (playErr) {
         console.error('[cosyvoice] 播放失败', playErr)
         throw playErr
