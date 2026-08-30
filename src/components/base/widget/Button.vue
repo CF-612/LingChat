@@ -64,9 +64,11 @@ const typeClasses = computed(() => {
     case 'big':
       return `
         w-full p-3 text-base font-bold rounded-lg
-        bg-[#e9ecef] text-[#495057]
-        hover:bg-[var(--accent-color)] hover:text-white 
-        hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(121,217,255,0.4)]
+        ${
+          props.active
+            ? 'bg-[var(--accent-color)] text-white -translate-y-0.5 shadow-[0_4px_10px_rgba(121,217,255,0.4)]'
+            : 'bg-[#e9ecef] text-[#495057] hover:bg-[var(--accent-color)] hover:text-white hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(121,217,255,0.4)]'
+        }
       `
 
     case 'select':

@@ -152,12 +152,12 @@
         <Sparkles :size="20" />
       </template>
       <div class="effect-list flex gap-4 overflow-x-auto pb-2">
-        <Button type="big" @click="updateParticle(`None`)">{{ $t('settings.background.particle.none') }}</Button>
-        <Button type="big" @click="updateParticle(`StarField`)">{{ $t('settings.background.particle.starField') }}</Button>
-        <Button type="big" @click="updateParticle(`Rain`)">{{ $t('settings.background.particle.rain') }}</Button>
-        <Button type="big" @click="updateParticle(`Sakura`)">{{ $t('settings.background.particle.sakura') }}</Button>
-        <Button type="big" @click="updateParticle(`Snow`)">{{ $t('settings.background.particle.snow') }}</Button>
-        <Button type="big" @click="updateParticle(`Fireworks`)">{{ $t('settings.background.particle.fireworks') }}</Button>
+        <Button type="big" :active="currentParticle === 'None'" @click="updateParticle(`None`)">{{ $t('settings.background.particle.none') }}</Button>
+        <Button type="big" :active="currentParticle === 'StarField'" @click="updateParticle(`StarField`)">{{ $t('settings.background.particle.starField') }}</Button>
+        <Button type="big" :active="currentParticle === 'Rain'" @click="updateParticle(`Rain`)">{{ $t('settings.background.particle.rain') }}</Button>
+        <Button type="big" :active="currentParticle === 'Sakura'" @click="updateParticle(`Sakura`)">{{ $t('settings.background.particle.sakura') }}</Button>
+        <Button type="big" :active="currentParticle === 'Snow'" @click="updateParticle(`Snow`)">{{ $t('settings.background.particle.snow') }}</Button>
+        <Button type="big" :active="currentParticle === 'Fireworks'" @click="updateParticle(`Fireworks`)">{{ $t('settings.background.particle.fireworks') }}</Button>
       </div>
     </MenuItem>
 
@@ -466,6 +466,7 @@ const globalMouseTrailEnabled = computed(() => settingsStore.globalMouseTrailEna
 const clickAnimationEnabled = computed(() => settingsStore.clickAnimationEnabled)
 const sceneAwarenessEnabled = computed(() => settingsStore.sceneAwarenessEnabled)
 const hdrModeEnabled = computed(() => settingsStore.hdrModeEnabled)
+const currentParticle = computed(() => settingsStore.backgroundEffect)
 
 // 记录进入设置页时的初始值；开关改变后「立即重启」按钮才可用，改回原值则恢复置灰
 const initialHdrMode = ref(settingsStore.hdrModeEnabled)
