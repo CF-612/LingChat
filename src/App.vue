@@ -112,6 +112,23 @@ const preventRootTouchScroll = (e: TouchEvent) => {
   e.preventDefault()
 }
 
+// 移动端禁用 WebView 原生缩放（双指捏合 / 双击放大）：
+// index.html 的 viewport meta（user-scalable=no + maximum-scale=1）与 base.css 的
+// touch-action: manipulation 为主，这里再兜底拦截 WebKit 缩放手势与多触点手势，
+// 确保 Android WebView / iOS WKWebView 都无法捏合或双击放大界面。
+const preventZoomGestures = (e: Event) => {
+  // iOS Safari/WKWebView 的捏合缩放会触发 gesturestart/change/end，preventDefault 可取消缩放
+  if (e.type === 'gesturestart' || e.type === 'gesturechange' || e.type === 'gestureend') {
+    e.preventDefault()
+    return
+  }
+  // 触点 >= 2 即是双指捏合手势（Android/通用），preventDefault 取消缩放
+  const te = e as TouchEvent
+  if (te.touches && te.touches.length > 1) {
+    e.preventDefault()
+  }
+}
+
 const syncVisualViewport = () => {
   if (!vv) return
   const root = document.documentElement
@@ -264,6 +281,12 @@ onMounted(async () => {
   // 硬锁滚动：任何滚动（键盘 focus-scroll / 手势）立即归零
   window.addEventListener('scroll', lockScroll, { passive: true, capture: true })
   document.addEventListener('touchmove', preventRootTouchScroll, { passive: false })
+  // 兜底：禁用双指/双击/捏合的原生缩放
+  document.addEventListener('gesturestart', preventZoomGestures, { passive: false })
+  document.addEventListener('gesturechange', preventZoomGestures, { passive: false })
+  document.addEventListener('gestureend', preventZoomGestures, { passive: false })
+  document.addEventListener('touchstart', preventZoomGestures, { passive: false })
+  document.addEventListener('touchmove', preventZoomGestures, { passive: false })
   // 聚焦变化 → 重算让位（focusin 先清 0 由 vv resize 收敛，focusout 归零）
   document.addEventListener('focusin', syncVisualViewport, true)
   document.addEventListener('focusout', syncVisualViewport, true)
@@ -327,6 +350,11 @@ onUnmounted(() => {
   window.removeEventListener('orientationchange', handleOrientationChange)
   window.removeEventListener('scroll', lockScroll, { capture: true } as any)
   document.removeEventListener('touchmove', preventRootTouchScroll)
+  document.removeEventListener('gesturestart', preventZoomGestures)
+  document.removeEventListener('gesturechange', preventZoomGestures)
+  document.removeEventListener('gestureend', preventZoomGestures)
+  document.removeEventListener('touchstart', preventZoomGestures)
+  document.removeEventListener('touchmove', preventZoomGestures)
   document.removeEventListener('focusin', syncVisualViewport, true)
   document.removeEventListener('focusout', syncVisualViewport, true)
   if (kbGuardTimer) {
