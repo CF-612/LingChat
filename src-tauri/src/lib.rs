@@ -836,6 +836,7 @@ pub fn run() {
             utils::cpu_perf::redetect_cpu,
             utils::gpu_perf::get_gpu_info,
             utils::gpu_perf::redetect_gpu,
+            utils::gpu_perf::grade_active_gpu,
             api::role_archive::import_role,
             api::role_archive::import_role_from_path,
             api::role_archive::cancel_role_import,
