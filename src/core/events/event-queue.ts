@@ -20,18 +20,26 @@ export class EventQueue {
       dialogueMerge.armed = false
     }
 
-    // 台词合并判定：新 reply 到达时，若当前展示的 i 句仍在打字/播音频、同角色、
-    // 够短、内联模式开启、且队列无挡路事件（i+1 就是下一条要处理的）→ 武装，
-    // 由 MainChat 在 i 展示完成时自动续打、GameDialog 走追加路径。判定只看 i 的
-    // 展示状态，不含用户点击（点击跳过后 isTyping 已变 false，但武装已在到达时定格）。
+    // 台词合并判定：新 reply 到达时，若当前展示的 i 句仍在展示、同角色、够短、
+    // 内联模式开启、且队列无挡路事件（i+1 就是下一条要处理的）→ 武装，
+    // 由 MainChat 在 i 展示完成时自动续打（merge 优先于 AUTO）、GameDialog 走追加路径。
+    // 「i 仍在展示」的判据：
+    //   - 非 AUTO：只看瞬时打字/音频状态（i 展示期间到达才合并）——保持原语义。
+    //   - AUTO：放宽为「队列正停着等推进」（isWaitingForUser，currentResolve 挂起）。
+    //     AUTO 的推进延迟可调、AI 连发时 i+1 常落在 i 已展示完、AUTO 还没推进的窗口，
+    //     此时仍应合并。isWaitingForUser 在 i 展示期间到被推进前恒为 true，比瞬时状态稳。
+    // 不含用户点击（点击跳过后 isTyping 已变 false，但武装已在到达时定格）。
     if (event.type === 'reply') {
       const settings = useSettingsStore()
       const gameStore = useGameStore()
       const uiStore = useUIStore()
+      const stillShowing = uiStore.autoMode
+        ? this.getState().isWaitingForUser
+        : dialogueMerge.isTyping || dialogueMerge.isAudioPlaying
       if (
         settings.text.inlineMotionText &&
         settings.text.mergeLineThreshold > 0 &&
-        (dialogueMerge.isTyping || dialogueMerge.isAudioPlaying) &&
+        stillShowing &&
         event.roleId === gameStore.currentInteractRoleId &&
         uiStore.showCharacterLine.length <= settings.text.mergeLineThreshold &&
         !this.queue.some((e) => e.type !== 'thinking')
