@@ -49,11 +49,11 @@
 </template>
 
 <script setup lang="ts">
+  import { getEnvConfigByKey } from "@/api/services/config";
   import FreeModeTools from "@/components/tools/FreeModeTools.vue";
   import ToolActivityStatus from "@/components/tools/ToolActivityStatus.vue";
-  import { eventQueue } from "@/core/events/event-queue";
   import { dialogueMerge } from "@/core/events/dialogue-merge";
-  import { getEnvConfigByKey } from "@/api/services/config";
+  import { eventQueue } from "@/core/events/event-queue";
   import { onMounted, onUnmounted, ref, watch } from "vue";
   import { useRouter } from "vue-router";
   import { useGameStore } from "../../stores/modules/game";
@@ -66,8 +66,8 @@
   import ImageSourcePicker from "@/components/ui/ImageSourcePicker.vue";
   import { useHideForSnapshot } from "@/composables/useHideForSnapshot";
   import { useSettingsSnapshot } from "@/composables/useSettingsSnapshot";
-  import { useSettingsStore } from "../../stores/modules/settings";
   import { isAndroid, isWindows } from "@/utils/platform";
+  import { useSettingsStore } from "../../stores/modules/settings";
   import GameExtraUI from "../game/standard/GameExtraUI.vue";
 
   const LOADING_STORAGE_KEY = "lingchat_loading_shown";
