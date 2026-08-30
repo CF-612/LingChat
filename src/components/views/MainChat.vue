@@ -64,8 +64,6 @@
 
   import FullAccessWarning from "@/components/tools/FullAccessWarning.vue";
   import ImageSourcePicker from "@/components/ui/ImageSourcePicker.vue";
-  import { useHideForSnapshot } from "@/composables/useHideForSnapshot";
-  import { useSettingsSnapshot } from "@/composables/useSettingsSnapshot";
   import { isAndroid, isWindows } from "@/utils/platform";
   import { useSettingsStore } from "../../stores/modules/settings";
   import GameExtraUI from "../game/standard/GameExtraUI.vue";
@@ -113,8 +111,6 @@
 
   const gameDialogRef = ref<InstanceType<typeof GameDialog> | null>(null);
   const menuPanelRef = ref<HTMLElement | null>(null);
-  const settingsSnapshot = useSettingsSnapshot();
-  const { hide: hideForSnapshot, restore: restoreForSnapshot } = useHideForSnapshot();
   let settingsSnapshotSession: number | null = null;
 
   const openSettings = async () => {
@@ -124,44 +120,22 @@
     if (isWindows()) {
       const el = menuPanelRef.value;
       (async () => {
-        let capturePromise: Promise<string | null> | null = null;
         try {
-          await hideForSnapshot(el);
-          capturePromise = settingsSnapshot.capture();
           uiStore.toggleSettings(true);
           uiStore.setSettingsTab("text");
-          const result = await capturePromise;
-          if (result) settingsSnapshotSession = settingsSnapshot.snapshotSessionId.value || null;
         } catch (e) {
           console.warn("[MainChat] settings snapshot failed:", e);
           // 失败也需打开设置，避免阻塞
           uiStore.toggleSettings(true);
           uiStore.setSettingsTab("text");
         } finally {
-          restoreForSnapshot(el);
         }
-        if (capturePromise) capturePromise.catch(() => restoreForSnapshot(el));
       })();
       return;
     }
     uiStore.toggleSettings(true);
     uiStore.setSettingsTab("text");
   };
-
-  // 关闭设置后释放 Windows 静态背景临时资源
-  watch(
-    () => uiStore.showSettings,
-    (show) => {
-      if (!show && isWindows() && settingsSnapshotSession !== null) {
-        const sid = settingsSnapshotSession;
-        settingsSnapshotSession = null;
-        settingsSnapshot.release(sid).catch(() => {});
-      } else if (!show && isWindows() && settingsSnapshot.snapshotSrc.value) {
-        // 兜底：MainMenu 未释放时由游戏侧释放
-        settingsSnapshot.release().catch(() => {});
-      }
-    }
-  );
 
   const switchAutoMode = () => {
     uiStore.autoMode = !uiStore.autoMode;
