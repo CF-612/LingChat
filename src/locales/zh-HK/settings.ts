@@ -1127,6 +1127,11 @@ export default {
         "needPreviewText": "請輸入試聽文字",
         "previewFailed": "試聽失敗: {error}"
       },
+      "phases": {
+        "uploading": "上傳語音樣本中…",
+        "submitting": "提交復刻任務…",
+        "submitted": "已提交，等待審核…"
+      },
     },
     "messages": {
       "readStatusFailed": "讀取本地 TTS 狀態失敗：{error}",

@@ -1127,6 +1127,11 @@ export default {
         needPreviewText: '試聴テキストを入力してください',
         previewFailed: '試聴に失敗: {error}',
       },
+      phases: {
+        uploading: '音声サンプルをアップロード中…',
+        submitting: 'クローン作成タスクを送信中…',
+        submitted: '審査に提出しました…',
+      },
     },
     messages: {
       readStatusFailed: 'ローカル TTS の状態の読み取りに失敗：{error}',

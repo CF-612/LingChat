@@ -62,9 +62,10 @@ impl CloudVoiceService {
         progress: impl Fn(&str),
     ) -> Result<CosyVoiceRecord> {
         let prefix = sanitize_prefix(name);
-        progress("上传语音样本中…");
+        // progress 回调传 phase key（uploading/submitting/submitted），文案由前端本地化
+        progress("uploading");
         let url = upload_audio(&self.api_key, model, file_path).await?;
-        progress("提交复刻任务…");
+        progress("submitting");
         let voice_id = create_voice(&self.api_key, model, &prefix, &url, Some(&[language])).await?;
         tracing::info!(
             "CosyVoice 音色已提交审核: model={} prefix={} name={} lang={} voice_id={}",
@@ -74,7 +75,7 @@ impl CloudVoiceService {
             language,
             voice_id
         );
-        progress("已提交，等待审核…");
+        progress("submitted");
         Ok(CosyVoiceRecord {
             voice_id,
             name: name.to_string(),

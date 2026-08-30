@@ -1,13 +1,24 @@
 //! CosyVoice 相关 Tauri commands。
 
+use std::sync::OnceLock;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
+use tokio::sync::Mutex as AsyncMutex;
 
 use super::CloudVoiceService;
 use crate::ai_service::tts::provider::TtsAdapter;
 use crate::config::keys;
 use crate::config::tts::{CosyVoiceRecord, TtsConfig};
+
+/// 串行化 `COSYVOICE_VOICES` 的读-改-写（整数组覆写 settings.json）。
+/// 前端会并发轮询多个音色，若不互斥，后写者会用旧快照覆盖先写者的状态更新，
+/// 导致本地缓存永远停在 deploying。
+static VOICES_LOCK: OnceLock<AsyncMutex<()>> = OnceLock::new();
+fn voices_lock() -> &'static AsyncMutex<()> {
+    VOICES_LOCK.get_or_init(|| AsyncMutex::new(()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CosyvoiceConfig {
@@ -108,7 +119,7 @@ pub async fn cosyvoice_create_voice(
             })
             .await
             .map_err(|e| e.to_string())?;
-        upsert_voice_record(&app, &record).map_err(|e| e.to_string())?;
+        upsert_voice_record(&app, &record).await.map_err(|e| e.to_string())?;
         Ok(record)
     }
     .await;
@@ -125,6 +136,8 @@ pub async fn cosyvoice_create_voice(
 pub async fn cosyvoice_voice_status(app: AppHandle, voice_id: String) -> Result<String, String> {
     let svc = service(&app).map_err(|e| e.to_string())?;
     let status = svc.status(&voice_id).await.map_err(|e| e.to_string())?;
+    // 锁内完成读-改-写，避免多个音色并发轮询时互相覆盖状态
+    let _guard = voices_lock().lock().await;
     let mut records = read_voice_records(&app);
     if let Some(record) = records.iter_mut().find(|r| r.voice_id == voice_id) {
         if record.status.as_deref() != Some(status.as_str()) {
@@ -158,6 +171,7 @@ pub async fn cosyvoice_delete_voice(app: AppHandle, voice_id: String) -> Result<
     if let Ok(svc) = service(&app) {
         let _ = svc.delete(&voice_id).await;
     }
+    let _guard = voices_lock().lock().await;
     let mut records = read_voice_records(&app);
     records.retain(|r| r.voice_id != voice_id);
     write_voice_records(&app, records).map_err(|e| e.to_string())
@@ -190,6 +204,13 @@ pub async fn cosyvoice_synthesize_preview(
         .iter()
         .find(|r| r.voice_id == voice_id)
         .ok_or_else(|| format!("音色不在本地列表中: {voice_id}"))?;
+    // 合成模型必须与注册音色时的模型一致，防前端传错模型被云端拒绝
+    if model != cached.model {
+        return Err(format!(
+            "音色 {voice_id} 注册模型为 {}，与请求模型 {model} 不一致",
+            cached.model
+        ));
+    }
     if needs_live_status_check(cached.status.as_deref()) {
         tracing::info!(
             "CosyVoice 试听自愈: 缓存状态={:?}，实时查询云端",
@@ -200,6 +221,7 @@ pub async fn cosyvoice_synthesize_preview(
             .await
             .map_err(|e| format!("查询音色状态失败: {e}"))?;
         tracing::info!("CosyVoice 试听自愈结果: {live}");
+        let _guard = voices_lock().lock().await;
         let mut records = read_voice_records(&app);
         if let Some(r) = records.iter_mut().find(|r| r.voice_id == voice_id) {
             r.status = Some(live.clone());
@@ -227,7 +249,8 @@ pub async fn cosyvoice_synthesize_preview(
 }
 
 /// 新增或更新一条音色记录（按 voice_id 去重）。
-fn upsert_voice_record(app: &AppHandle, record: &CosyVoiceRecord) -> Result<()> {
+async fn upsert_voice_record(app: &AppHandle, record: &CosyVoiceRecord) -> Result<()> {
+    let _guard = voices_lock().lock().await;
     let mut records = read_voice_records(app);
     records.retain(|r| r.voice_id != record.voice_id);
     records.push(record.clone());

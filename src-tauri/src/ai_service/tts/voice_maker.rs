@@ -128,6 +128,14 @@ fn segment_text_for_lang<'a>(lang: &str, segment: &'a EmotionSegment) -> Option<
     }
 }
 
+/// CosyVoice `language_hints` 官方支持范围（不含 es/ar，方言经 instruction 触发）。
+fn cosyvoice_supported_language(lang: &str) -> bool {
+    matches!(
+        lang,
+        "zh" | "en" | "ja" | "ko" | "fr" | "de" | "ru" | "pt" | "th" | "id" | "vi"
+    )
+}
+
 impl VoiceMaker {
     pub fn new(temp_dir: PathBuf, audio_format: impl Into<String>, tts_config: TtsConfig) -> Self {
         let audio_format = audio_format.into();
@@ -453,7 +461,8 @@ impl VoiceMaker {
                         .unwrap_or_else(|| "cosyvoice-v3.5-flash".to_string());
                     let mut adapter = CosyvoiceAdapter::new(api_key, model, voice_id);
                     // 方言：仅中文生效，通过 instruction 指令触发（复刻音色需指令才输出方言）；
-                    // 其余语言：用 language_hints 指定合成目标语言，提升数字/小语种效果
+                    // 其余语言：仅官方支持的语言才用 language_hints 指定合成目标语言
+                    // （es/ar 等不支持的值会触发云端报错，跳过即可）
                     if self.lang == "zh" {
                         if let Some(dialect) = self
                             .voice_dialect
@@ -463,7 +472,7 @@ impl VoiceMaker {
                             tracing::info!("CosyVoice 方言模式: {dialect}");
                             adapter = adapter.with_instruction(&format!("用{dialect}说话。"));
                         }
-                    } else if !self.lang.is_empty() {
+                    } else if cosyvoice_supported_language(&self.lang) {
                         adapter = adapter.with_language_hints(&self.lang);
                     }
                     self.provider.cosyvoice = Some(Arc::new(adapter));

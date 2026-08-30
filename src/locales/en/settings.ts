@@ -1129,6 +1129,11 @@ export default {
         needPreviewText: 'Enter text to preview',
         previewFailed: 'Preview failed: {error}',
       },
+      phases: {
+        uploading: 'Uploading voice sample…',
+        submitting: 'Submitting clone task…',
+        submitted: 'Submitted for review…',
+      },
     },
     messages: {
       readStatusFailed: 'Failed to read local TTS status: {error}',

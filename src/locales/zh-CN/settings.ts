@@ -1163,6 +1163,11 @@ export default {
         needPreviewText: '请输入试听文本',
         previewFailed: '试听失败: {error}',
       },
+      phases: {
+        uploading: '上传语音样本中…',
+        submitting: '提交复刻任务…',
+        submitted: '已提交，等待审核…',
+      },
     },
     messages: {
       readStatusFailed: '读取本地 TTS 状态失败：{error}',

@@ -1196,7 +1196,9 @@ async function registerCosyVoice(): Promise<void> {
       cosySamplePath.value,
       cosyLang.value,
       (phase) => {
-        notice.value = { kind: 'success', text: phase }
+        // 后端 progress 传 phase key（uploading/submitting/submitted），此处映射本地化文案
+        const phaseText = t(`settings.tts.cosyvoice.phases.${phase}`)
+        notice.value = { kind: 'success', text: phaseText }
       },
     )
     notice.value = {
