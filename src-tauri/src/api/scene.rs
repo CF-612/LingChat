@@ -23,6 +23,10 @@ pub struct SceneInfo {
     pub lighting: Option<LightingParams>,
     pub created_at: String,
     pub updated_at: String,
+    /// 来源："game" 或提供该场景背景图的插件 id（插件场景写入 scenes.json，带 plugin_id 标签）。
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
 }
 
 // ========== Request types ==========
@@ -64,9 +68,19 @@ fn to_background_fullpath(filename: &str) -> String {
     if filename.is_empty() {
         return String::new();
     }
+    // 插件场景直接存绝对路径：已是绝对路径且存在则原样返回。
+    let direct = std::path::Path::new(filename);
+    if direct.is_absolute() && direct.exists() {
+        return filename.to_string();
+    }
     // 先在背景目录（含子文件夹）里按文件名递归查找，支持背景放在子分类下
     if let Some(found) = super::background::find_background_file_recursive(&data_dir(), filename) {
         return found;
+    }
+    // 如果已经是完整路径（旧数据兼容），先提取文件名再拼接
+    let name = to_background_filename(filename);
+    if name.is_empty() {
+        return String::new();
     }
     // 找不到：返回空字符串，前端走"缺图占位"分支（显示缺图图标）
     String::new()
@@ -77,7 +91,7 @@ pub(crate) fn normalize_background(raw: &str) -> String {
     to_background_fullpath(raw)
 }
 
-fn model_to_info(s: &Scene) -> SceneInfo {
+pub(crate) fn model_to_info(s: &Scene) -> SceneInfo {
     let bg = normalize_background(&s.background);
     SceneInfo {
         id: s.id.clone(),
@@ -88,6 +102,8 @@ fn model_to_info(s: &Scene) -> SceneInfo {
         lighting: s.lighting.clone(),
         created_at: s.created_at.clone(),
         updated_at: s.updated_at.clone(),
+        source: s.plugin_id.clone().unwrap_or_else(|| "game".to_string()),
+        plugin_id: s.plugin_id.clone(),
     }
 }
 
@@ -227,6 +243,7 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
                 category,
                 created_at: now.clone(),
                 updated_at: now,
+                plugin_id: None,
             });
             added = true;
         }
@@ -258,6 +275,7 @@ pub async fn create_scene(_app: AppHandle, req: CreateSceneRequest) -> Result<Sc
         lighting: req.lighting,
         created_at: now.clone(),
         updated_at: now,
+        plugin_id: None,
     };
     let info = model_to_info(&scene);
     scenes.push(scene);

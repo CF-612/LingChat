@@ -35,6 +35,9 @@ export interface BackgroundImageInfo {
   time: string
   /** 所属子分类（子文件夹名；根目录为“根目录”） */
   category?: string
+  /** 来源："game" 或提供该背景图的插件 id。 */
+  source?: string
+  plugin_id?: string | null
 }
 
 export interface Clothes {
@@ -53,6 +56,9 @@ export interface Character {
   resource_folder?: string
   adventure_count?: number
   total_adventures?: number
+  /** 来源："game" 或提供该角色的插件 id。 */
+  source?: string
+  plugin_id?: string | null
 }
 
 export interface CharacterSelectParams {
@@ -75,4 +81,7 @@ export interface MusicTrack {
   time: string
   /** 所属子分类（子文件夹名；根目录为“根目录”） */
   category?: string
+  /** 来源："game" 或提供该音乐的插件 id。 */
+  source?: string
+  plugin_id?: string | null
 }

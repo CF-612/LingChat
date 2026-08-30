@@ -231,6 +231,10 @@ pub struct Scene {
     pub category: String,
     pub created_at: String,
     pub updated_at: String,
+    /// 该场景来自哪个插件（None = 游戏自有 / 用户上传场景）。
+    /// 插件背景图自动注册为场景时写入，用于启停 / 隐藏时同步增删。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
 }
 
 fn default_scene_category() -> String {

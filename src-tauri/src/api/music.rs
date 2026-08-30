@@ -2,12 +2,14 @@ use std::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
+use crate::plugins::ResourceKind;
 use crate::utils::path::validate_path_in_base;
 use crate::utils::system::open_folder;
 
-use super::music_dir;
+use super::{default_source, mtime_secs, music_dir};
 
 // ========== 响应类型 ==========
 
@@ -19,6 +21,11 @@ pub struct MusicItemInfo {
     pub time: String,
     /// 音乐所属子分类（子文件夹名；根目录为"根目录"）
     pub category: String,
+    /// 来源："game" 或提供该音乐的插件 id。
+    #[serde(default = "default_source")]
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -68,12 +75,8 @@ fn collect_music_recursive(base: &Path, category: &str, out: &mut Vec<(std::path
 }
 
 #[tauri::command]
-pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
+pub async fn get_music_list(app: AppHandle) -> Result<Vec<MusicItemInfo>, String> {
     let music_dir = music_dir();
-
-    if !music_dir.exists() {
-        return Ok(Vec::new());
-    }
 
     let allowed_extensions = ["mp3", "wav", "flac", "webm", "weba", "ogg", "oga"];
 
@@ -109,7 +112,24 @@ pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
 
         let url = path.to_string_lossy().into_owned();
 
-        items.push(MusicItemInfo { name, url, time, category });
+        items.push(MusicItemInfo { name, url, time, category, source: "game".to_string(), plugin_id: None });
+    }
+    // 合并插件背景音乐
+    let plugin_entries = app
+        .state::<crate::AppState>()
+        .data()
+        .plugin_manager
+        .visible_file_entries(ResourceKind::Musics)
+        .await;
+    for e in plugin_entries {
+        items.push(MusicItemInfo {
+            name: e.name,
+            url: e.path.to_string_lossy().into_owned(),
+            time: mtime_secs(&e.path),
+            category: "插件".to_string(),
+            source: e.plugin_id.clone(),
+            plugin_id: Some(e.plugin_id),
+        });
     }
 
     items.sort_by(|a, b| {
@@ -127,24 +147,25 @@ pub fn get_music_list() -> Result<Vec<MusicItemInfo>, String> {
 #[tauri::command]
 pub fn list_music_categories() -> Result<Vec<String>, String> {
     let music_dir = music_dir();
-    if !music_dir.exists() {
-        return Ok(Vec::new());
-    }
     let mut cats = std::collections::BTreeSet::new();
-    fn walk(base: &Path, cats: &mut std::collections::BTreeSet<String>) {
-        if let Ok(entries) = fs::read_dir(base) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        cats.insert(name.to_string());
+    // 插件背景音乐是虚拟分类（不映射到 music 下的子文件夹），始终可选
+    cats.insert("插件".to_string());
+    if music_dir.exists() {
+        fn walk(base: &Path, cats: &mut std::collections::BTreeSet<String>) {
+            if let Ok(entries) = fs::read_dir(base) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            cats.insert(name.to_string());
+                        }
+                        walk(&path, cats);
                     }
-                    walk(&path, cats);
                 }
             }
         }
+        walk(&music_dir, &mut cats);
     }
-    walk(&music_dir, &mut cats);
     Ok(cats.into_iter().collect())
 }
 
@@ -337,7 +358,7 @@ pub async fn upload_music(
 /// 删除指定音乐文件
 /// url 参数可以是完整路径或纯文件名，统一从 music_dir 中删除
 #[tauri::command]
-pub fn delete_music(url: String) -> Result<Vec<MusicItemInfo>, String> {
+pub async fn delete_music(app: AppHandle, url: String) -> Result<Vec<MusicItemInfo>, String> {
     let base = music_dir();
 
     // 从路径中提取文件名，兼容完整路径和纯文件名
@@ -356,7 +377,7 @@ pub fn delete_music(url: String) -> Result<Vec<MusicItemInfo>, String> {
 
     fs::remove_file(&file_path).map_err(|e| format!("删除音乐文件失败: {}", e))?;
 
-    get_music_list()
+    get_music_list(app).await
 }
 
 // ========== 会话状态持久化 ==========

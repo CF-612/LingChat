@@ -17,6 +17,7 @@
           :info="character.info"
           :clothes="character.clothes || []"
           :resource-folder="character.resourceFolder"
+          :source="character.source"
           @saved="handleSettingsSaved"
           @favoredChange="applyCharacterFavoriteOrder"
         />
@@ -121,6 +122,7 @@ interface CharacterCardData {
   subName: string
   clothes?: Clothes[]
   resourceFolder?: string
+  source?: string | null
 }
 
 const characters = ref<CharacterCardData[]>([])
@@ -184,6 +186,7 @@ const mapCharacter = (char: ApiCharacter): CharacterCardData => {
         }))
       : [],
     resourceFolder: char.resource_folder,
+    source: char.source,
   }
 }
 

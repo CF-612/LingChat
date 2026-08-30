@@ -215,22 +215,9 @@
           <p class="text-sm text-gray-300">{{ $t('ui.toolCalls.enableWebSearch') }}</p>
         </div>
 
-        <div class="flex items-center gap-3 py-2.5 px-1">
-          <Toggle
-            :checked="form.web_search.use_builtin"
-            @change="(value: boolean) => (form.web_search.use_builtin = value)"
-          />
-          <p class="text-sm text-gray-300">{{ $t('ui.toolCalls.useBuiltin') }}</p>
-        </div>
-
-        <p v-if="form.web_search.use_builtin" class="text-sm text-gray-400 px-1 mb-2">
-          {{ $t('ui.toolCalls.builtinHint') }}
-        </p>
-
-        <template v-if="!form.web_search.use_builtin">
-          <label class="inline-flex items-center font-medium text-brand mt-2">
-            {{ $t('ui.toolCalls.provider') }}
-          </label>
+        <label class="inline-flex items-center font-medium text-brand mt-2">
+          {{ $t('ui.toolCalls.provider') }}
+        </label>
           <select
             v-model="form.web_search.provider"
             class="w-full mt-2 px-3 py-2.5 border rounded-lg text-sm text-white bg-white/10 backdrop-blur-xl backdrop-saturate-150 border-white/10 shadow-glass focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all duration-200 cursor-pointer"
@@ -259,7 +246,7 @@
             </p>
           </template>
 
-          <!-- 独立端点模式下 kimi/bocha/deepseek/custom 后端都强制校验 API Key，始终显示输入框 -->
+          <!-- Kimi 可留空复用当前官方 Kimi Code 对话凭据；其他独立端点需要 API Key -->
           <template v-else>
             <label class="inline-flex items-center font-medium text-brand mt-4">
               {{ $t('ui.toolCalls.apiKey') }}
@@ -270,10 +257,18 @@
               :placeholder="
                 form.web_search.provider === 'deepseek'
                   ? $t('ui.toolCalls.dsApiKeyPlaceholder')
-                  : $t('ui.toolCalls.apiKeyPlaceholder')
+                  : form.web_search.provider === 'kimi'
+                    ? $t('ui.toolCalls.kimiApiKeyPlaceholder')
+                    : $t('ui.toolCalls.apiKeyPlaceholder')
               "
               class="w-full mt-2 px-3 py-2.5 border rounded-lg text-sm text-white bg-white/10 backdrop-blur-xl backdrop-saturate-150 border-white/10 shadow-glass focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all duration-200"
             />
+            <p
+              v-if="form.web_search.provider === 'kimi'"
+              class="text-sm mt-2 mb-2 text-gray-300"
+            >
+              {{ $t('ui.toolCalls.kimiHint') }}
+            </p>
           </template>
 
           <!-- DeepSeek Responses：可切换模型；结果数量由服务端决定，不展示条数设置 -->
@@ -322,7 +317,6 @@
               class="w-full mt-2 px-3 py-2.5 border rounded-lg text-sm text-white bg-white/10 backdrop-blur-xl backdrop-saturate-150 border-white/10 shadow-glass focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all duration-200"
             />
           </template>
-        </template>
 
         <div class="flex items-center gap-3 py-2.5 px-1">
           <Toggle
@@ -579,7 +573,6 @@ const navLabel = (item: string) =>
 const form = reactive<ToolSettings>({
   web_search: {
     enabled: false,
-    use_builtin: true,
     provider: 'kimi',
     model: 'deepseek-v4-flash',
     api_key: '',

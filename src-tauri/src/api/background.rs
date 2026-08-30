@@ -2,11 +2,14 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
+use tauri::{AppHandle, Manager};
+
+use crate::plugins::ResourceKind;
 use crate::utils::path::validate_path_in_base;
 use crate::utils::system::open_folder;
 use serde::{Deserialize, Serialize};
 
-use super::backgrounds_dir;
+use super::{backgrounds_dir, default_source, mtime_secs};
 
 // ========== 响应类型 ==========
 
@@ -18,6 +21,11 @@ pub struct BackgroundItemInfo {
     pub time: String,
     /// 背景所属子分类（子文件夹名；根目录为“根目录”）
     pub category: String,
+    /// 来源："game" 或提供该背景图的插件 id。
+    #[serde(default = "default_source")]
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_id: Option<String>,
 }
 
 // ========== 递归扫描背景目录（含子文件夹，即子分类） ==========
@@ -97,12 +105,8 @@ fn collect_backgrounds_recursive(base: &Path, category: &str, out: &mut Vec<(std
 // ========== Tauri 命令 ==========
 
 #[tauri::command]
-pub fn get_background_list() -> Result<Vec<BackgroundItemInfo>, String> {
+pub async fn get_background_list(app: AppHandle) -> Result<Vec<BackgroundItemInfo>, String> {
     let bg_dir = backgrounds_dir();
-
-    if !bg_dir.exists() {
-        return Ok(Vec::new());
-    }
 
     let allowed_extensions = ["png", "jpg", "jpeg", "webp", "bmp", "svg", "tif", "gif"];
 
@@ -138,7 +142,24 @@ pub fn get_background_list() -> Result<Vec<BackgroundItemInfo>, String> {
 
         let url = path.to_string_lossy().into_owned();
 
-        items.push(BackgroundItemInfo { title, url, time, category });
+        items.push(BackgroundItemInfo { title, url, time, category, source: "game".to_string(), plugin_id: None });
+    }
+    // 合并插件背景图（已按游戏优先 + 插件间先注册者赢 + 隐藏过滤）
+    let plugin_entries = app
+        .state::<crate::AppState>()
+        .data()
+        .plugin_manager
+        .visible_file_entries(ResourceKind::Backgrounds)
+        .await;
+    for e in plugin_entries {
+        items.push(BackgroundItemInfo {
+            title: e.name,
+            url: e.path.to_string_lossy().into_owned(),
+            time: mtime_secs(&e.path),
+            category: "插件".to_string(),
+            source: e.plugin_id.clone(),
+            plugin_id: Some(e.plugin_id),
+        });
     }
 
     items.sort_by(|a, b| {
@@ -156,25 +177,26 @@ pub fn get_background_list() -> Result<Vec<BackgroundItemInfo>, String> {
 #[tauri::command]
 pub fn list_background_categories() -> Result<Vec<String>, String> {
     let bg_dir = backgrounds_dir();
-    if !bg_dir.exists() {
-        return Ok(Vec::new());
-    }
     let mut cats = std::collections::BTreeSet::new();
-    // 递归扫描子文件夹名
-    fn walk(base: &Path, cats: &mut std::collections::BTreeSet<String>) {
-        if let Ok(entries) = fs::read_dir(base) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                        cats.insert(name.to_string());
+    // 插件背景是虚拟分类（不映射到 backgrounds 下的子文件夹），始终可选
+    cats.insert("插件".to_string());
+    if bg_dir.exists() {
+        // 递归扫描子文件夹名
+        fn walk(base: &Path, cats: &mut std::collections::BTreeSet<String>) {
+            if let Ok(entries) = fs::read_dir(base) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            cats.insert(name.to_string());
+                        }
+                        walk(&path, cats);
                     }
-                    walk(&path, cats);
                 }
             }
         }
+        walk(&bg_dir, &mut cats);
     }
-    walk(&bg_dir, &mut cats);
     Ok(cats.into_iter().collect())
 }
 
@@ -279,7 +301,8 @@ pub fn get_background_file(filename: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn upload_background_image(
+pub async fn upload_background_image(
+    app: AppHandle,
     file_name: String,
     file_data: Vec<u8>,
     category: Option<String>,
@@ -312,7 +335,7 @@ pub fn upload_background_image(
         .map_err(|e| format!("写入文件失败: {}", e))?;
     f.flush().map_err(|e| format!("刷新文件失败: {}", e))?;
 
-    get_background_list()
+    get_background_list(app).await
 }
 
 #[tauri::command]
