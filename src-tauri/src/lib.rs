@@ -854,6 +854,13 @@ pub fn run() {
             ai_service::tts::local::tts_local_import_style_vectors,
             ai_service::tts::local::tts_local_synthesize_preview,
             ai_service::tts::local::tts_local_get_enabled,
+            ai_service::tts::cloud::commands::cosyvoice_get_config,
+            ai_service::tts::cloud::commands::cosyvoice_save_api_key,
+            ai_service::tts::cloud::commands::cosyvoice_create_voice,
+            ai_service::tts::cloud::commands::cosyvoice_voice_status,
+            ai_service::tts::cloud::commands::cosyvoice_list_voices,
+            ai_service::tts::cloud::commands::cosyvoice_delete_voice,
+            ai_service::tts::cloud::commands::cosyvoice_synthesize_preview,
             ai_service::tts::local::tts_local_set_enabled,
             // 推理设备选择：获取当前设备 / 枚举可用设备 / 切换设备
             ai_service::tts::local::tts_local_get_device,
