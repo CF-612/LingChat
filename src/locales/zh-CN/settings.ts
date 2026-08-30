@@ -771,6 +771,18 @@ export default {
       title: "内联动作文本",
       desc: "开启后动作文本将与台词同时显示，无需二次点击",
     },
+    mergeLine: {
+      title: "台词合并阈值",
+      unit: "字（0=关闭）",
+    },
+    mergeDelay: {
+      title: "台词合并续打延迟",
+    },
+    mergeMotion: {
+      title: "动作文本合并方式",
+      append: "接在后面显示",
+      replace: "独立显示本次动作",
+    },
     sedentary: {
       title: "久坐喝水提醒",
       desc: "开启后每40分钟发送提醒一下久坐哦，只是健康小助手捏",

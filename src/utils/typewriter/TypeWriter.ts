@@ -10,6 +10,10 @@ export class TypeWriter {
   private textBuffer: string
   /** 本次 start() 的目标全文；finish() 补全时用，保证「跳过打字」能显示完整文本 */
   private targetText: string
+  /** 当前打字进度（字符下标）；append() 续打时从该位置继续 */
+  private i = 0
+  /** 当前打字循环闭包；append() 在打字结束后复用其恢复续打 */
+  private typingLoop: (() => void) | null = null
   private writeFn: ((element: HTMLElement, text: string) => void) | null
 
   private onFinishCallback: (() => void) | null
@@ -140,6 +144,7 @@ export class TypeWriter {
     this._status = 'typing'
     this.textBuffer = ''
     this.targetText = text
+    this.i = 0
 
     // Parse speed
     if (speed !== undefined) {
@@ -152,8 +157,6 @@ export class TypeWriter {
       this.initAudio()
     }
 
-    let i = 0
-
     return new Promise<void>((resolve) => {
       const typing = (): void => {
         // Guard: stale generation means a newer start() has taken over
@@ -162,8 +165,10 @@ export class TypeWriter {
           return
         }
 
-        if (i < text.length) {
-          this.textBuffer += text.charAt(i)
+        // 读 this.targetText / this.i：中途 append() 扩充目标文本时，
+        // 循环自然从上次位置继续，把新增字符也打出来。
+        if (this.i < this.targetText.length) {
+          this.textBuffer += this.targetText.charAt(this.i)
           if (this.writeFn) {
             this.writeFn(this.element, this.textBuffer)
           } else if (
@@ -175,7 +180,7 @@ export class TypeWriter {
           if (this.onTextUpdateCallback) {
             this.onTextUpdateCallback(this.textBuffer)
           }
-          i++
+          this.i++
           this.element.scrollTop = this.element.scrollHeight
 
           this.playRandomSound()
@@ -198,9 +203,32 @@ export class TypeWriter {
         }
       }
 
+      this.typingLoop = typing
+
       // Start the typing loop immediately
       typing()
     })
+  }
+
+  /**
+   * 追加文本到当前打字目标末尾（台词合并：i+1 句到达后接续显示）。
+   *
+   * 若打字仍在进行，目标文本被扩充，运行中的打字循环会自然继续把新增
+   * 字符打出来（读 this.targetText / this.i）；若已自然完成或被点击跳过
+   * （status 为 completed），则复用原循环闭包从 this.i（已在 finish() 中对齐
+   * 全文末尾）恢复续打。被 stop() 中断过（无有效闭包）时退化为直接补全。
+   */
+  public append(text: string): void {
+    this.targetText += text
+    if (this._status !== 'typing') {
+      this._status = 'typing'
+      if (this.typingLoop) {
+        this.typingLoop()
+      } else {
+        // 无可用续打闭包（被 stop 中断过）：直接补全已追加内容
+        this.finish()
+      }
+    }
   }
 
   /** Immediately complete the current typing animation (show all text). */
@@ -220,6 +248,9 @@ export class TypeWriter {
       this.element.value = full
     }
     this.textBuffer = full
+    // 进度对齐全文末尾：点击跳过后 textBuffer 已是全文，但 this.i 停在点击处；
+    // 之后 append() 续打时若从 this.i 继续会把旧字符重复打一遍。对齐后只打新增部分。
+    this.i = this.targetText.length
     if (this.onTextUpdateCallback) {
       this.onTextUpdateCallback(full)
     }
@@ -235,6 +266,7 @@ export class TypeWriter {
   public stop(): void {
     this.stopTimer()
     this.generation++ // invalidate any lingering typing closures
+    this.typingLoop = null
     this._status = 'idle'
   }
 
@@ -249,6 +281,8 @@ export class TypeWriter {
       this.element.value = ''
     }
     this.textBuffer = ''
+    this.targetText = ''
+    this.i = 0
   }
 
   /** Full cleanup: stop animation, clear text, close audio resources. */

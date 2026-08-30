@@ -745,6 +745,18 @@ export default {
       title: "內聯動作文字",
       desc: "開咗之後動作文字會同台詞一齊顯示，唔使撳第二次",
     },
+    mergeLine: {
+      title: "對白合併閾值",
+      unit: "字（0=關閉）",
+    },
+    mergeDelay: {
+      title: "對白合併續打延遲",
+    },
+    mergeMotion: {
+      title: "動作文本合併方式",
+      append: "接喺後面顯示",
+      replace: "獨立顯示本次動作",
+    },
     sedentary: {
       title: "久坐飲水提醒",
       desc: "開咗之後每40分鐘會發個提醒提提你唔好坐太耐，淨係健康小助手咋",

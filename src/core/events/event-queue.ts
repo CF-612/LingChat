@@ -1,6 +1,9 @@
 import type { ScriptEventType } from '../../types'
 import { eventProcessorManager } from './event-processor'
 import { useGameStore } from '../../stores/modules/game'
+import { useSettingsStore } from '../../stores/modules/settings'
+import { useUIStore } from '../../stores/modules/ui/ui'
+import { dialogueMerge } from './dialogue-merge'
 
 export class EventQueue {
   private queue: ScriptEventType[] = []
@@ -14,7 +17,30 @@ export class EventQueue {
       this.currentResolve()
       this.currentResolve = null
       this.queue = []
+      dialogueMerge.armed = false
     }
+
+    // 台词合并判定：新 reply 到达时，若当前展示的 i 句仍在打字/播音频、同角色、
+    // 够短、内联模式开启、且队列无挡路事件（i+1 就是下一条要处理的）→ 武装，
+    // 由 MainChat 在 i 展示完成时自动续打、GameDialog 走追加路径。判定只看 i 的
+    // 展示状态，不含用户点击（点击跳过后 isTyping 已变 false，但武装已在到达时定格）。
+    if (event.type === 'reply') {
+      const settings = useSettingsStore()
+      const gameStore = useGameStore()
+      const uiStore = useUIStore()
+      if (
+        settings.text.inlineMotionText &&
+        settings.text.mergeLineThreshold > 0 &&
+        (dialogueMerge.isTyping || dialogueMerge.isAudioPlaying) &&
+        event.roleId === gameStore.currentInteractRoleId &&
+        uiStore.showCharacterLine.length <= settings.text.mergeLineThreshold &&
+        !this.queue.some((e) => e.type !== 'thinking')
+      ) {
+        dialogueMerge.armed = true
+        dialogueMerge.armedRoleId = event.roleId
+      }
+    }
+
     this.queue.push(event)
     if (!this.isProcessing && !this.paused) {
       this.processQueue()
@@ -121,10 +147,16 @@ export class EventQueue {
 
   private resetToInputState() {
     this.currentEvent = null
+    dialogueMerge.armed = false
 
     const gameStore = useGameStore()
     gameStore.currentStatus = 'input'
     gameStore.currentLine = ''
+  }
+
+  /** 查看队头「下一个要处理」的事件（跳过 thinking），不消费队列。 */
+  peek(): ScriptEventType | null {
+    return this.queue.find((e) => e.type !== 'thinking') ?? null
   }
 
   getState() {

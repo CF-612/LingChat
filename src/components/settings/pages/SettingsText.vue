@@ -146,6 +146,60 @@
         </Toggle>
       </MenuItem>
 
+      <!-- 台词合并阈值：同角色连续短句自动合并续打（仅内联动作文本模式生效）；0=关闭 -->
+      <MenuItem
+        :title="$t('settings.text.mergeLine.title')"
+        size="small"
+      >
+        <template #header>
+          <AlignJustify :size="20" />
+        </template>
+        <Slider v-model="mergeLineThreshold" :min="0" :max="100" :step="1">
+          <template #left>{{ mergeLineThreshold }}</template>
+          <template #right>{{ $t('settings.text.mergeLine.unit') }}</template>
+        </Slider>
+      </MenuItem>
+
+      <!-- 台词合并续打延迟：上一句展示完成到接续打下一句之间的停顿 -->
+      <MenuItem
+        :title="$t('settings.text.mergeDelay.title')"
+        size="small"
+      >
+        <template #header>
+          <Timer :size="20" />
+        </template>
+        <Slider v-model="mergeLineDelay" :min="0" :max="1000" :step="50">
+          <template #left>{{ mergeLineDelay }}</template>
+          <template #right>ms</template>
+        </Slider>
+      </MenuItem>
+
+      <!-- 动作文本合并方式：append=接在后面显示（| 分隔）/ replace=清空旧动作，独立显示本次动作 -->
+      <MenuItem
+        :title="$t('settings.text.mergeMotion.title')"
+        size="small"
+      >
+        <template #header>
+          <Combine :size="20" />
+        </template>
+        <div class="flex items-center gap-2">
+          <Button
+            type="select"
+            :active="mergeMotionMode === 'append'"
+            @click="setMergeMotionMode('append')"
+          >
+            {{ $t('settings.text.mergeMotion.append') }}
+          </Button>
+          <Button
+            type="select"
+            :active="mergeMotionMode === 'replace'"
+            @click="setMergeMotionMode('replace')"
+          >
+            {{ $t('settings.text.mergeMotion.replace') }}
+          </Button>
+        </div>
+      </MenuItem>
+
       <MenuItem
         :title="$t('settings.text.sedentary.title')"
         size="small"
@@ -666,6 +720,7 @@ import {
   Gauge,
   Timer,
   Bug,
+  Combine,
 } from 'lucide-vue-next'
 import {
   codexAuthStatus,
@@ -1088,6 +1143,27 @@ const autoAdvanceDelay = computed({
   get: () => settingsStore.autoAdvanceDelay,
   set: (val: number) => settingsStore.update('text.autoAdvanceDelay', val),
 })
+
+// 台词合并阈值（字符数，仅计聊天文本；0=关闭合并）
+const mergeLineThreshold = computed({
+  get: () => settingsStore.text.mergeLineThreshold,
+  set: (val: number) => settingsStore.update('text.mergeLineThreshold', val),
+})
+
+// 台词合并续打延迟（ms）
+const mergeLineDelay = computed({
+  get: () => settingsStore.text.mergeLineDelay,
+  set: (val: number) => settingsStore.update('text.mergeLineDelay', val),
+})
+
+// 台词合并时动作文本的处理方式：append=接在后面显示（| 分隔）/ replace=独立显示本次动作
+const mergeMotionMode = computed<'append' | 'replace'>({
+  get: () => settingsStore.text.mergeMotionMode ?? 'append',
+  set: (val) => settingsStore.update('text.mergeMotionMode', val),
+})
+const setMergeMotionMode = (val: 'append' | 'replace') => {
+  settingsStore.update('text.mergeMotionMode', val)
+}
 
 // ─── 界面字体选择 ───────────────────────────────────────────
 const systemFonts = ref<string[]>([])

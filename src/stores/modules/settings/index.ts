@@ -16,6 +16,9 @@ export const DEFAULT_SETTINGS = {
     autoAdvanceDelay: 1000, // 自动模式自动推进延迟 (ms, 0-2000)
     animation: true, // 页面切换动画
     inlineMotionText: false, // 内联动作文本（单次显示台词+灰字动作）
+    mergeLineThreshold: 20, // 台词合并阈值：同角色连续短句（字符数）自动合并续打；0=关闭
+    mergeLineDelay: 200, // 台词合并时上一句展示完成到续打的延迟 (ms)
+    mergeMotionMode: 'append' as const, // 台词合并时动作文本的处理方式：append=接在后面显示（| 分隔）/ replace=清空旧动作，独立显示本次动作
     sedentaryReminder: false, // 久坐喝水提醒
     fontFamily: '', // 自定义界面字体名（为空走系统默认栈；初始菜单/加载页不受影响）
     vueDevToolsEnabled: true, // Vue DevTools 悬浮面板显示开关（仅开发模式生效，全局所有窗口）
@@ -72,6 +75,9 @@ export interface TextSettings {
   autoAdvanceDelay: number
   animation: boolean
   inlineMotionText: boolean
+  mergeLineThreshold: number
+  mergeLineDelay: number
+  mergeMotionMode: 'append' | 'replace'
   sedentaryReminder: boolean
   fontFamily: string
   vueDevToolsEnabled: boolean

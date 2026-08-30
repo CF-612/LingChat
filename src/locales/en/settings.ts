@@ -772,6 +772,18 @@ export default {
       title: "Inline Action Text",
       desc: "When on, action text displays together with the dialogue — no extra click needed",
     },
+    mergeLine: {
+      title: "Merge Line Threshold",
+      unit: "chars (0=off)",
+    },
+    mergeDelay: {
+      title: "Merge Line Continue Delay",
+    },
+    mergeMotion: {
+      title: "Motion Text Merge Mode",
+      append: "Append after previous",
+      replace: "Show current only",
+    },
     sedentary: {
       title: "Sedentary & Hydration Reminder",
       desc: "When on, a reminder pops up every 40 minutes about sitting too long — just your little health buddy~",

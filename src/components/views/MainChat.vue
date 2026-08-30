@@ -52,8 +52,9 @@
   import FreeModeTools from "@/components/tools/FreeModeTools.vue";
   import ToolActivityStatus from "@/components/tools/ToolActivityStatus.vue";
   import { eventQueue } from "@/core/events/event-queue";
+  import { dialogueMerge } from "@/core/events/dialogue-merge";
   import { getEnvConfigByKey } from "@/api/services/config";
-  import { onMounted, ref, watch } from "vue";
+  import { onMounted, onUnmounted, ref, watch } from "vue";
   import { useRouter } from "vue-router";
   import { useGameStore } from "../../stores/modules/game";
   import { useUIStore } from "../../stores/modules/ui/ui";
@@ -189,6 +190,12 @@
     }
   });
 
+  // 卸载时清掉音频播放状态与合并续打定时器：避免返回后首条回复被当成「续打合并」
+  onUnmounted(() => {
+    dialogueMerge.isAudioPlaying = false;
+    cancelMergeAdvance();
+  });
+
   /* 自动模式（AUTO）逻辑：事件驱动，非轮询
    * 当且仅当以下全部满足时，延迟 settingsStore.autoAdvanceDelay（默认 1000ms，可在设置→文字中调节）自动推进下一句：
    * 1. 自动模式开启
@@ -233,12 +240,14 @@
   // 音频开始播放
   const handleAudioStarted = () => {
     audioFinished.value = false;
+    dialogueMerge.isAudioPlaying = true;
     cancelAutoAdvance();
   };
 
   // 音频播放结束
   const handleAudioFinished = () => {
     audioFinished.value = true;
+    dialogueMerge.isAudioPlaying = false;
     scheduleAutoAdvance();
   };
 
@@ -283,6 +292,44 @@
       }
     }
   );
+
+  // 台词合并自动续打（独立于 AUTO 模式）：i+1 到达时已武装，i 的展示（打字+音频）
+  // 完成后再留 mergeLineDelay 停顿，然后自动推进队列 → GameDialog 对 i+1 走追加路径。
+  // 续打开始后 isTyping=true，会取消 AUTO 定时器，不重复推进；早于 AUTO 的延迟调度，
+  // 避免闪一下停住。延迟窗口内若被用户手动推进（armed 已消费），定时器重查条件后放弃。
+  let mergeAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cancelMergeAdvance = () => {
+    if (mergeAdvanceTimer) {
+      clearTimeout(mergeAdvanceTimer);
+      mergeAdvanceTimer = null;
+    }
+  };
+
+  watch([() => dialogueMerge.armed, typingFinished, audioFinished], () => {
+    if (
+      dialogueMerge.armed &&
+      typingFinished.value &&
+      audioFinished.value &&
+      gameStore.currentStatus === "responding"
+    ) {
+      cancelMergeAdvance();
+      mergeAdvanceTimer = setTimeout(() => {
+        mergeAdvanceTimer = null;
+        // 延迟窗口内可能已被用户手动推进 / 状态变化，重查条件
+        if (!dialogueMerge.armed || gameStore.currentStatus !== "responding") return;
+        const next = eventQueue.peek();
+        if (next?.type === "reply" && next.roleId === dialogueMerge.armedRoleId) {
+          gameDialogRef.value?.continueDialog(false);
+        } else {
+          // 防御：队头不是被合并的那条（被其他事件挡路），放弃合并
+          dialogueMerge.armed = false;
+        }
+      }, settingsStore.text.mergeLineDelay);
+    } else {
+      cancelMergeAdvance();
+    }
+  });
 </script>
 
 <style>
