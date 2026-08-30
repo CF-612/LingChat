@@ -693,7 +693,6 @@ export default {
       favoredZone: '收藏区',
       unfavoredZone: '未收藏区',
     },
-    },
     pagination: {
       first: '← 首页',
       last: '末页 →',
