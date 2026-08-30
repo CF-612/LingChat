@@ -58,23 +58,41 @@ useSedentaryReminder()
 const uiStore = useUIStore()
 const settingsStore = useSettingsStore()
 
-// 等待「入场问候」处理完成（后端在问候生成/跳过时发 entry:greeting-done），用于桌宠 loading。
-function waitEntryGreetingDone() {
-  return new Promise<void>((resolve) => {
-    let settled = false
-    let unlisten: (() => void) | null = null
-    const finish = () => {
-      if (settled) return
-      settled = true
-      unlisten?.()
-      resolve()
-    }
-    listen('entry:greeting-done', finish).then((u) => {
-      if (settled) u()
-      else unlisten = u
-    })
-    setTimeout(finish, 15000)
+// 先注册完成事件，再触发「入场问候」，避免后端快速完成时漏掉事件。
+async function waitEntryGreetingDone(trigger: () => Promise<unknown>) {
+  let settled = false
+  let resolveDone!: () => void
+  let unlisten: (() => void) | null = null
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const done = new Promise<void>((resolve) => {
+    resolveDone = resolve
   })
+  const finish = () => {
+    if (settled) return
+    settled = true
+    if (timeout) clearTimeout(timeout)
+    unlisten?.()
+    unlisten = null
+    resolveDone()
+  }
+
+  const registeredUnlisten = await listen('entry:greeting-done', finish).catch((err) => {
+    console.warn('[Entry] 完成事件监听注册失败（非致命）:', err)
+    return null
+  })
+  if (settled) registeredUnlisten?.()
+  else unlisten = registeredUnlisten
+  timeout = setTimeout(finish, 15000)
+
+  try {
+    void trigger()
+    if (!registeredUnlisten) finish()
+    await done
+  } finally {
+    if (timeout) clearTimeout(timeout)
+    unlisten?.()
+    unlisten = null
+  }
 }
 
 function applyFont(font?: string) {
@@ -191,11 +209,11 @@ onMounted(async () => {
 
           // 3) API 就绪、TTS 刷新完成后，再触发「入场问候」，保证语音合成时服务已可用
           if (auto.startup_greeting) {
-            const wait = waitEntryGreetingDone()
-            invoke('notify_player_entry').catch((err) =>
-              console.warn('[Entry] 问候触发失败（非致命）:', err),
+            await waitEntryGreetingDone(() =>
+              invoke('notify_player_entry').catch((err) => {
+                console.warn('[Entry] 问候触发失败（非致命）:', err)
+              }),
             )
-            await wait
           }
 
           // 4) 保证 loading 至少展示一段时间（给刷新/落盘留缓冲）

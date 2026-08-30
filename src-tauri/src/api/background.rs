@@ -5,7 +5,9 @@ use std::path::Path;
 use tauri::{AppHandle, Manager};
 
 use crate::plugins::ResourceKind;
-use crate::utils::path::validate_path_in_base;
+use crate::utils::path::{
+    move_directory_files_to, validate_directory_name, validate_path_in_base,
+};
 use crate::utils::system::open_folder;
 use serde::{Deserialize, Serialize};
 
@@ -203,23 +205,20 @@ pub fn list_background_categories() -> Result<Vec<String>, String> {
 /// 新建一个背景子分类（在 backgrounds/ 下创建子文件夹）。
 #[tauri::command]
 pub fn create_background_category(name: String) -> Result<(), String> {
-    let safe = name.trim();
-    if safe.is_empty() {
-        return Err("分类名不能为空".to_string());
-    }
-    // 防止路径穿越：分类名只能作为单层目录名
-    if safe.contains('/') || safe.contains('\\') || safe.contains("..") {
-        return Err("分类名不能包含路径分隔符".to_string());
+    let safe = validate_directory_name(&name)?;
+    if matches!(safe.as_str(), "根目录" | "全部" | "插件") {
+        return Err("不能使用保留分类名".to_string());
     }
     let bg_dir = backgrounds_dir();
     if !bg_dir.exists() {
         fs::create_dir_all(&bg_dir).map_err(|e| format!("创建背景目录失败: {}", e))?;
     }
-    let target = bg_dir.join(safe);
+    let target = bg_dir.join(&safe);
     if target.exists() {
         return Err(format!("分类「{}」已存在", safe));
     }
     fs::create_dir(&target).map_err(|e| format!("创建分类「{}」失败: {}", safe, e))?;
+    validate_path_in_base(&target, &bg_dir)?;
     Ok(())
 }
 
@@ -229,56 +228,34 @@ pub fn create_background_category(name: String) -> Result<(), String> {
 /// 返回受影响（移动/删除）的背景数量。
 #[tauri::command]
 pub fn delete_background_category(name: String, mode: String) -> Result<usize, String> {
-    let safe = name.trim();
-    if safe.is_empty() {
-        return Err("分类名不能为空".to_string());
+    let safe = validate_directory_name(&name)?;
+    if matches!(safe.as_str(), "根目录" | "全部" | "插件") {
+        return Err("不能删除保留分类".to_string());
     }
     let bg_dir = backgrounds_dir();
-    let sub = bg_dir.join(safe);
+    let sub = bg_dir.join(&safe);
     if !sub.exists() || !sub.is_dir() {
         return Err(format!("分类「{}」不存在", safe));
     }
-
-    let mut affected = 0usize;
-    let allowed_extensions = ["png", "jpg", "jpeg", "webp", "bmp", "svg", "tif", "gif"];
+    validate_path_in_base(&sub, &bg_dir)?;
 
     // 收集子目录下所有背景文件
     let mut files: Vec<std::path::PathBuf> = Vec::new();
     collect_background_files_recursive_pub(&sub, &mut files);
 
-    if mode == "move_to_root" {
-        // 移动到根目录
+    let affected = if mode == "move_to_root" {
         if !bg_dir.exists() {
             fs::create_dir_all(&bg_dir).map_err(|e| format!("创建背景目录失败: {}", e))?;
         }
-        for f in files {
-            let Some(file_name) = f.file_name().map(|n| n.to_string_lossy().to_string()) else {
-                continue;
-            };
-            let _ext_ok = f
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| allowed_extensions.contains(&e.to_lowercase().as_str()))
-                .unwrap_or(false);
-            let dest = bg_dir.join(&file_name);
-            // 若根目录已有同名文件，跳过（避免覆盖）
-            if dest.exists() {
-                continue;
-            }
-            if fs::rename(&f, &dest).is_ok() {
-                affected += 1;
-            }
-        }
-        // 删除（可能已空的）子目录
-        let _ = fs::remove_dir_all(&sub);
-    } else {
+        move_directory_files_to(&sub, &bg_dir)?
+    } else if mode == "delete_all" {
         // 全部删除：删除整个子目录
-        affected = files.len();
+        let affected = files.len();
         fs::remove_dir_all(&sub).map_err(|e| format!("删除分类「{}」失败: {}", safe, e))?;
-    }
-
-    // 清理空的父级子文件夹（如果有嵌套）
-    let _ = fs::remove_dir(&sub);
+        affected
+    } else {
+        return Err(format!("无效的分类删除模式: {mode}"));
+    };
 
     Ok(affected)
 }
@@ -321,10 +298,18 @@ pub async fn upload_background_image(
 
     // 目标目录：若指定了分类，则写入子文件夹（并确保其存在）；否则写入根目录
     let target_dir = match category.as_deref() {
-        Some(cat) if !cat.trim().is_empty() && cat != "全部" && cat != "根目录" => {
-            let sub = bg_dir.join(cat.trim());
-            fs::create_dir_all(&sub).map_err(|e| format!("创建分类目录失败: {}", e))?;
-            sub
+        Some(cat) if !cat.trim().is_empty() => {
+            let category = validate_directory_name(cat)?;
+            if matches!(category.as_str(), "全部" | "根目录") {
+                bg_dir.clone()
+            } else if category == "插件" {
+                return Err("不能上传到插件分类".to_string());
+            } else {
+                let sub = bg_dir.join(category);
+                fs::create_dir_all(&sub).map_err(|e| format!("创建分类目录失败: {}", e))?;
+                validate_path_in_base(&sub, &bg_dir)?;
+                sub
+            }
         }
         _ => bg_dir.clone(),
     };

@@ -6,7 +6,9 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
 use crate::plugins::ResourceKind;
-use crate::utils::path::validate_path_in_base;
+use crate::utils::path::{
+    move_directory_files_to, validate_directory_name, validate_path_in_base,
+};
 use crate::utils::system::open_folder;
 
 use super::{default_source, mtime_secs, music_dir};
@@ -172,45 +174,51 @@ pub fn list_music_categories() -> Result<Vec<String>, String> {
 /// 新建一个音乐子分类（子文件夹）。
 #[tauri::command]
 pub fn create_music_category(name: String) -> Result<(), String> {
-    let name = name.trim();
-    if name.is_empty() || name == "根目录" || name == "全部" {
-        return Err("无效的分类名".into());
+    let name = validate_directory_name(&name)?;
+    if matches!(name.as_str(), "根目录" | "全部" | "插件") {
+        return Err("不能使用保留分类名".into());
     }
-    let dir = music_dir().join(name);
-    fs::create_dir_all(&dir).map_err(|e| format!("创建分类目录失败: {}", e))
+    let base = music_dir();
+    fs::create_dir_all(&base).map_err(|e| format!("创建音乐目录失败: {}", e))?;
+    let dir = base.join(name);
+    fs::create_dir_all(&dir).map_err(|e| format!("创建分类目录失败: {}", e))?;
+    validate_path_in_base(&dir, &base)
+}
+
+fn resolve_music_path(base: &Path, url: &str) -> std::path::PathBuf {
+    let requested = std::path::PathBuf::from(url);
+    if requested.is_absolute() {
+        requested
+    } else {
+        base.join(requested)
+    }
 }
 
 /// 删除一个音乐子分类：mode = "move" 把其下音乐移到根目录；"delete" 连同音乐一起删除。返回受影响数量。
 #[tauri::command]
 pub fn delete_music_category(name: String, mode: String) -> Result<usize, String> {
-    let name = name.trim();
-    if name.is_empty() || name == "根目录" || name == "全部" {
-        return Err("无效的分类名".into());
+    let name = validate_directory_name(&name)?;
+    if matches!(name.as_str(), "根目录" | "全部" | "插件") {
+        return Err("不能删除保留分类".into());
     }
-    let dir = music_dir().join(name);
+    let base = music_dir();
+    let dir = base.join(&name);
     if !dir.is_dir() {
         return Ok(0);
     }
-    let mut count = 0usize;
-    let entries = fs::read_dir(&dir).map_err(|e| format!("读取目录失败: {}", e))?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            match mode.as_str() {
-                "move" => {
-                    let dest = music_dir().join(path.file_name().unwrap_or_default());
-                    let _ = fs::rename(&path, &dest);
-                    count += 1;
-                }
-                _ => {
-                    let _ = fs::remove_file(&path);
-                    count += 1;
-                }
-            }
+    validate_path_in_base(&dir, &base)?;
+
+    match mode.as_str() {
+        "move" => move_directory_files_to(&dir, &base),
+        "delete" => {
+            let mut files = Vec::new();
+            collect_music_recursive(&dir, "", &mut files);
+            let count = files.len();
+            fs::remove_dir_all(&dir).map_err(|e| format!("删除分类「{}」失败: {}", name, e))?;
+            Ok(count)
         }
+        _ => Err(format!("无效的分类删除模式: {mode}")),
     }
-    let _ = fs::remove_dir_all(&dir);
-    Ok(count)
 }
 
 /// 打开音乐所在文件夹。
@@ -298,14 +306,27 @@ pub async fn upload_music(
         // 4. 确保目标目录存在：若指定分类，则写入对应子文件夹
         let music_dir = music_dir();
         let target_dir = match category.as_deref() {
-            Some(cat) if !cat.trim().is_empty() && cat != "根目录" && cat != "全部" => {
-                let sub = music_dir.join(cat.trim());
-                if !sub.exists() {
-                    tokio::fs::create_dir_all(&sub)
-                        .await
-                        .map_err(|e| format!("创建分类目录失败: {}", e))?;
+            Some(cat) if !cat.trim().is_empty() => {
+                let category = validate_directory_name(cat)?;
+                if matches!(category.as_str(), "根目录" | "全部") {
+                    if !music_dir.exists() {
+                        tokio::fs::create_dir_all(&music_dir)
+                            .await
+                            .map_err(|e| format!("创建音乐目录失败: {}", e))?;
+                    }
+                    music_dir.clone()
+                } else if category == "插件" {
+                    return Err("不能上传到插件分类".to_string());
+                } else {
+                    let sub = music_dir.join(category);
+                    if !sub.exists() {
+                        tokio::fs::create_dir_all(&sub)
+                            .await
+                            .map_err(|e| format!("创建分类目录失败: {}", e))?;
+                    }
+                    validate_path_in_base(&sub, &music_dir)?;
+                    sub
                 }
-                sub
             }
             _ => {
                 if !music_dir.exists() {
@@ -356,28 +377,37 @@ pub async fn upload_music(
 }
 
 /// 删除指定音乐文件
-/// url 参数可以是完整路径或纯文件名，统一从 music_dir 中删除
+/// url 参数可以是 music_dir 内的完整路径、相对路径或根目录文件名。
 #[tauri::command]
 pub async fn delete_music(app: AppHandle, url: String) -> Result<Vec<MusicItemInfo>, String> {
     let base = music_dir();
-
-    // 从路径中提取文件名，兼容完整路径和纯文件名
-    let filename = std::path::Path::new(&url)
-        .file_name()
-        .ok_or_else(|| format!("无效的文件路径: {}", url))?
-        .to_string_lossy()
-        .into_owned();
-
-    let file_path = base.join(&filename);
+    let file_path = resolve_music_path(&base, &url);
     validate_path_in_base(&file_path, &base)?;
 
-    if !file_path.exists() {
-        return Err(format!("音乐文件不存在: {}", filename));
+    if !file_path.is_file() {
+        return Err(format!("音乐文件不存在: {}", file_path.display()));
     }
 
     fs::remove_file(&file_path).map_err(|e| format!("删除音乐文件失败: {}", e))?;
 
     get_music_list(app).await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::resolve_music_path;
+
+    #[test]
+    fn preserves_category_segments_in_relative_music_urls() {
+        let base = Path::new("music");
+        assert_eq!(
+            resolve_music_path(base, "battle/boss.mp3"),
+            base.join("battle").join("boss.mp3")
+        );
+        assert_eq!(resolve_music_path(base, "boss.mp3"), base.join("boss.mp3"));
+    }
 }
 
 // ========== 会话状态持久化 ==========
