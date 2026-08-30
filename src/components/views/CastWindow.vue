@@ -31,13 +31,8 @@
       <SchedulePanel />
     </div>
     <div class="cast-top-right">
-      <Button
-        type="nav"
-        icon="text"
-        @click="openSettings"
-        v-show="uiStore.showSettings !== true"
-      >
-        <h3 class="text-lg font-bold m-0">{{ $t('views.mainChat.menu') }}</h3>
+      <Button type="nav" icon="text" @click="openSettings" v-show="uiStore.showSettings !== true">
+        <h3 class="m-0 text-lg font-bold">{{ $t("views.mainChat.menu") }}</h3>
       </Button>
     </div>
   </div>
@@ -47,16 +42,16 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-  import { invoke } from '@tauri-apps/api/core'
-  import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-  import { GameBackground, GameRolesStage, GameDialog } from '@/components/game/standard'
-  import { Button } from '@/components/base'
-  import SchedulePanel from '@/components/schedule/SchedulePanel.vue'
-  import SettingsPanel from '@/components/settings/SettingsPanel.vue'
-  import { useGameStore } from '@/stores/modules/game'
-  import { useUIStore } from '@/stores/modules/ui/ui'
-  import { listScenes, type SceneInfo } from '@/api/services/scene'
+  import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+  import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { GameBackground, GameRolesStage, GameDialog } from "@/components/game/standard";
+  import { Button } from "@/components/base";
+  import SchedulePanel from "@/components/schedule/SchedulePanel.vue";
+  import SettingsPanel from "@/components/settings/SettingsPanel.vue";
+  import { useGameStore } from "@/stores/modules/game";
+  import { useUIStore } from "@/stores/modules/ui/ui";
+  import { listScenes, type SceneInfo } from "@/api/services/scene";
 
   /**
    * 主窗口镜像（App.vue 在台词变化时经 cast_emit_mirror 存储 + 广播 cast:mirror）。
@@ -66,46 +61,46 @@
    * 镜像把主窗口「正在显示的完整状态」整包同步过来，投屏完全跟随主窗口。
    */
   interface CastMirror {
-    line: string
-    title: string
-    subtitle: string
-    emotion: string
-    motionText: string
-    status: string
-    background: string | null
-    backgroundEffect: string | null
-    currentSceneId: string | null
-    presentRoleIds: number[]
-    currentRoleId: number | null
+    line: string;
+    title: string;
+    subtitle: string;
+    emotion: string;
+    motionText: string;
+    status: string;
+    background: string | null;
+    backgroundEffect: string | null;
+    currentSceneId: string | null;
+    presentRoleIds: number[];
+    currentRoleId: number | null;
     /** 当前交互角色的 Live2D / 立绘表情（镜像携带，驱动表情切换） */
-    roleEmotion: string
+    roleEmotion: string;
     /** 当前交互角色的原始情绪标签（立绘目录映射用） */
-    roleOriginalEmotion: string
+    roleOriginalEmotion: string;
   }
 
   /** 设置页「角色调整 / 对话框调整」的投屏渲染参数（默认与主界面一致） */
   interface CastTune {
-    charScale: number
-    charOffsetX: number
-    charOffsetY: number
-    dialogWidth: number
-    dialogHeight: number
-    dialogFontSize: number
-    dialogBgOpacity: number
+    charScale: number;
+    charOffsetX: number;
+    charOffsetY: number;
+    dialogWidth: number;
+    dialogHeight: number;
+    dialogFontSize: number;
+    dialogBgOpacity: number;
     /** 隐藏对话框：true 时对话层整体不显示，只留背景与角色舞台 */
-    dialogHidden: boolean
+    dialogHidden: boolean;
   }
 
-  const gameStore = useGameStore()
-  const uiStore = useUIStore()
+  const gameStore = useGameStore();
+  const uiStore = useUIStore();
 
   // 右上「菜单」：打开设置面板（同 MainChat.openSettings，投屏里直接调 settings）
   const openSettings = () => {
-    uiStore.toggleSettings(true)
-    uiStore.setSettingsTab('text')
-  }
+    uiStore.toggleSettings(true);
+    uiStore.setSettingsTab("text");
+  };
 
-  const gameDialogRef = ref<InstanceType<typeof GameDialog> | null>(null)
+  const gameDialogRef = ref<InstanceType<typeof GameDialog> | null>(null);
   // 调参值：挂载时从 cast_get_status 读取，设置页改动经 cast:config 事件即时同步。
   // 缩放与偏移作为 prop 注入角色布局（偏移在布局内夹紧）；对话框经 CSS 变量。
   const tune = reactive<CastTune>({
@@ -117,96 +112,96 @@
     dialogFontSize: 20,
     dialogBgOpacity: 70,
     dialogHidden: false,
-  })
+  });
   const castShellStyle = computed<Record<string, string>>(() => {
-    const bgAlpha = tune.dialogBgOpacity / 100
+    const bgAlpha = tune.dialogBgOpacity / 100;
     return {
       // 角色层水平偏移（CSS translateX 整层平移；垂直偏移走角色布局 prop）
-      '--cast-char-offset-x': `${tune.charOffsetX}px`,
-      '--cast-dialog-width': `${tune.dialogWidth}%`,
-      '--cast-dialog-height': `${tune.dialogHeight}vh`,
-      '--cast-dialog-font-size': `${tune.dialogFontSize}px`,
+      "--cast-char-offset-x": `${tune.charOffsetX}px`,
+      "--cast-dialog-width": `${tune.dialogWidth}%`,
+      "--cast-dialog-height": `${tune.dialogHeight}vh`,
+      "--cast-dialog-font-size": `${tune.dialogFontSize}px`,
       // 背景渐变 alpha：底 0.7、顶 0.6（复刻主界面默认 dialogOpacity 0.7）
-      '--cast-dialog-bg-alpha': String(bgAlpha),
-      '--cast-dialog-bg-alpha-top': String(Math.max(0, bgAlpha - 0.1)),
-    }
-  })
+      "--cast-dialog-bg-alpha": String(bgAlpha),
+      "--cast-dialog-bg-alpha-top": String(Math.max(0, bgAlpha - 0.1)),
+    };
+  });
 
   function applyTune(s: Partial<CastTune>) {
-    if (typeof s.charScale === 'number') tune.charScale = s.charScale
-    if (typeof s.charOffsetX === 'number') tune.charOffsetX = s.charOffsetX
-    if (typeof s.charOffsetY === 'number') tune.charOffsetY = s.charOffsetY
-    if (typeof s.dialogWidth === 'number') tune.dialogWidth = s.dialogWidth
-    if (typeof s.dialogHeight === 'number') tune.dialogHeight = s.dialogHeight
-    if (typeof s.dialogFontSize === 'number') tune.dialogFontSize = s.dialogFontSize
-    if (typeof s.dialogBgOpacity === 'number') tune.dialogBgOpacity = s.dialogBgOpacity
-    if (typeof s.dialogHidden === 'boolean') tune.dialogHidden = s.dialogHidden
+    if (typeof s.charScale === "number") tune.charScale = s.charScale;
+    if (typeof s.charOffsetX === "number") tune.charOffsetX = s.charOffsetX;
+    if (typeof s.charOffsetY === "number") tune.charOffsetY = s.charOffsetY;
+    if (typeof s.dialogWidth === "number") tune.dialogWidth = s.dialogWidth;
+    if (typeof s.dialogHeight === "number") tune.dialogHeight = s.dialogHeight;
+    if (typeof s.dialogFontSize === "number") tune.dialogFontSize = s.dialogFontSize;
+    if (typeof s.dialogBgOpacity === "number") tune.dialogBgOpacity = s.dialogBgOpacity;
+    if (typeof s.dialogHidden === "boolean") tune.dialogHidden = s.dialogHidden;
   }
 
   // 场景缓存：避免每次对账都请求一次
-  let scenesCache: SceneInfo[] = []
+  let scenesCache: SceneInfo[] = [];
 
   // ── 本地静音：投屏窗口只展示画面、不出声，避免与主窗口双重出声 ──
   // uiStore 的音量字段是 settings 的 getter（会持久化到用户全局设置），
   // 所以不能在投屏窗口里改它们，改在 HTMLMediaElement 原型层面拦截。
   function applyCastMute() {
     const muteEl = (el: HTMLMediaElement) => {
-      el.muted = true
+      el.muted = true;
       try {
-        el.volume = 0
+        el.volume = 0;
       } catch {
         /* ignore */
       }
-    }
+    };
 
     // 音量 setter 一律写不进去、读出来恒为 0
     try {
-      Object.defineProperty(HTMLMediaElement.prototype, 'volume', {
+      Object.defineProperty(HTMLMediaElement.prototype, "volume", {
         get() {
-          return 0
+          return 0;
         },
         set() {
           /* no-op：投屏窗口永远静音 */
         },
         configurable: true,
-      })
+      });
     } catch {
       /* ignore */
     }
 
     // 每次 play 前强制静音（防 AudioAcrossFade 等组件淡入淡出后重新出声）
-    const origPlay = HTMLMediaElement.prototype.play
+    const origPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      this.muted = true
-      return origPlay.call(this)
-    }
+      this.muted = true;
+      return origPlay.call(this);
+    };
 
     // 监听动态挂载的 audio/video（角色语音、BGM、环境音等）
     const observer = new MutationObserver(() => {
-      document.querySelectorAll('audio, video').forEach((el) => muteEl(el as HTMLMediaElement))
-    })
-    observer.observe(document.body, { childList: true, subtree: true })
-    document.querySelectorAll('audio, video').forEach((el) => muteEl(el as HTMLMediaElement))
+      document.querySelectorAll("audio, video").forEach((el) => muteEl(el as HTMLMediaElement));
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    document.querySelectorAll("audio, video").forEach((el) => muteEl(el as HTMLMediaElement));
   }
 
   // ── 场景 / 角色应用（镜像与快照对账共用） ──────────────────
 
   // 背景图 / 背景效果
   function applyBackground(bg: string, effect: string) {
-    if (bg && bg !== uiStore.currentBackground) uiStore.setCurrentBackground(bg)
-    if (effect !== uiStore.currentBackgroundEffect) uiStore.setBackgroundEffect(effect)
+    if (bg && bg !== uiStore.currentBackground) uiStore.setCurrentBackground(bg);
+    if (effect !== uiStore.currentBackgroundEffect) uiStore.setBackgroundEffect(effect);
   }
 
   // 场景光照（GameRolesStage 的 lightOverlayStyle 依赖 currentScene）
   async function applyScene(sceneId: string) {
     try {
-      let scene = scenesCache.find((s) => s.id === String(sceneId))
+      let scene = scenesCache.find((s) => s.id === String(sceneId));
       if (!scene) {
-        scenesCache = await listScenes()
-        scene = scenesCache.find((s) => s.id === String(sceneId))
+        scenesCache = await listScenes();
+        scene = scenesCache.find((s) => s.id === String(sceneId));
       }
       if (scene && gameStore.currentScene?.id !== String(sceneId)) {
-        gameStore.setCurrentScene(scene)
+        gameStore.setCurrentScene(scene);
       }
     } catch {
       /* 场景光照缺失不阻塞渲染 */
@@ -216,23 +211,24 @@
   // 在场角色（有序 onstage 优先，后端已处理回退）：
   // 角色列表变化才重设，避免每次都打断 Live2D 舞台。
   async function applyRoles(roleIds: number[], currentRoleId: number | null) {
-    const ids = roleIds ?? []
-    const curIds = gameStore.presentRoleIds
-    const rolesChanged =
-      ids.length !== curIds.length || ids.some((id, i) => id !== curIds[i])
-    if (!rolesChanged) return
-    gameStore.presentRoleIds = [...ids]
-    gameStore.mainRoleId = currentRoleId ?? ids[0] ?? -1
+    const ids = roleIds ?? [];
+    const curIds = gameStore.presentRoleIds;
+    const rolesChanged = ids.length !== curIds.length || ids.some((id, i) => id !== curIds[i]);
+    if (!rolesChanged) return;
+    gameStore.presentRoleIds = [...ids];
+    gameStore.mainRoleId = currentRoleId ?? ids[0] ?? -1;
     // 当前交互角色失联（被移下舞台）时回退到镜像角色；否则保持事件流给的值
-    const curInteract = gameStore.currentInteractRoleId
+    const curInteract = gameStore.currentInteractRoleId;
     if (curInteract == null || (ids.length > 0 && !ids.includes(curInteract))) {
-      gameStore.currentInteractRoleId = currentRoleId ?? ids[0] ?? null
+      gameStore.currentInteractRoleId = currentRoleId ?? ids[0] ?? null;
     }
     await Promise.all(
       ids.map((id) =>
-        gameStore.getOrCreateGameRole(id).catch((e) => console.warn(`[Cast] 角色 ${id} 加载失败`, e)),
-      ),
-    )
+        gameStore
+          .getOrCreateGameRole(id)
+          .catch((e) => console.warn(`[Cast] 角色 ${id} 加载失败`, e))
+      )
+    );
   }
 
   // 当前角色的情绪状态写入角色对象：触发 Live2D 表情 / 静态立绘切换。
@@ -240,44 +236,44 @@
   // 投屏窗口不消费 ai:reply（否则按消息到达时间显示），只能由镜像携带的状态补上。
   async function applyRoleEmotion(roleId: number, emotion: string, originalEmotion: string) {
     try {
-      const role = await gameStore.getOrCreateGameRole(roleId)
-      const next = emotion || '正常'
-      const nextOrig = originalEmotion || '正常'
+      const role = await gameStore.getOrCreateGameRole(roleId);
+      const next = emotion || "正常";
+      const nextOrig = originalEmotion || "正常";
       // 仅在变化时写，避免反复触发 Live2D 表情重放 / 立绘重新解析
-      if (role.emotion !== next) role.emotion = next
-      if (role.originalEmotion !== nextOrig) role.originalEmotion = nextOrig
+      if (role.emotion !== next) role.emotion = next;
+      if (role.originalEmotion !== nextOrig) role.originalEmotion = nextOrig;
     } catch (e) {
-      console.warn(`[Cast] 同步角色 ${roleId} 情绪失败：`, e)
+      console.warn(`[Cast] 同步角色 ${roleId} 情绪失败：`, e);
     }
   }
 
   // ── 镜像应用：主窗口当前显示什么，投屏就显示什么 ────────────
   async function applyMirror(m: CastMirror) {
     // 场景部分（仅变化时应用，避免打断 Live2D 舞台）
-    applyBackground(m.background ?? '', m.backgroundEffect ?? '')
-    if (m.currentSceneId) void applyScene(m.currentSceneId)
-    await applyRoles(m.presentRoleIds ?? [], m.currentRoleId ?? null)
+    applyBackground(m.background ?? "", m.backgroundEffect ?? "");
+    if (m.currentSceneId) void applyScene(m.currentSceneId);
+    await applyRoles(m.presentRoleIds ?? [], m.currentRoleId ?? null);
 
     // 情绪状态：在角色就位后应用到当前交互角色（Live2D 表情 / 立绘切换）
     if (m.currentRoleId != null) {
-      await applyRoleEmotion(m.currentRoleId, m.roleEmotion ?? '', m.roleOriginalEmotion ?? '')
+      await applyRoleEmotion(m.currentRoleId, m.roleEmotion ?? "", m.roleOriginalEmotion ?? "");
     }
 
     // 对话部分
-    const line = m.line ?? ''
-    uiStore.showCharacterLine = line
+    const line = m.line ?? "";
+    uiStore.showCharacterLine = line;
     if (line) {
       // 台词非空 → 强制 'responding'：投屏只展示内容（输入框被 CSS 隐藏）。
       // 轮到玩家时主窗口是 'input'，若照搬状态，回复显示区会被 v-show 隐藏
       // （textarea 又被 CSS 藏掉）→ 一片空白。强制回应态让最后一句保持可见。
-      uiStore.showCharacterTitle = m.title ?? ''
-      uiStore.showCharacterSubtitle = m.subtitle ?? ''
-      uiStore.showCharacterEmotion = m.emotion ?? ''
-      uiStore.showCharacterMotionText = m.motionText ?? ''
-      gameStore.currentStatus = 'responding'
+      uiStore.showCharacterTitle = m.title ?? "";
+      uiStore.showCharacterSubtitle = m.subtitle ?? "";
+      uiStore.showCharacterEmotion = m.emotion ?? "";
+      uiStore.showCharacterMotionText = m.motionText ?? "";
+      gameStore.currentStatus = "responding";
     } else {
       // 无台词（新会话 / 展示阶段清空）：回到闲置态，投屏显示空白
-      gameStore.currentStatus = 'input'
+      gameStore.currentStatus = "input";
     }
   }
 
@@ -285,77 +281,77 @@
   // 台词完全由镜像驱动（保证与主界面逐句同步）；这里只兜底场景类状态——
   // 主窗口里用户本地点背景、选场景、改舞台角色等操作不广播事件也不改台词，
   // 定期拉后端权威快照（cast_get_snapshot）同步这些非对话状态。
-  let reconciling = false
+  let reconciling = false;
 
   async function reconcileFromSnapshot() {
-    if (reconciling) return
-    reconciling = true
+    if (reconciling) return;
+    reconciling = true;
     try {
-      let snap: CastSnapshot
+      let snap: CastSnapshot;
       try {
-        snap = await invoke<CastSnapshot>('cast_get_snapshot')
+        snap = await invoke<CastSnapshot>("cast_get_snapshot");
       } catch (e) {
-        console.warn('[Cast] 读取场景快照失败：', e)
-        return
+        console.warn("[Cast] 读取场景快照失败：", e);
+        return;
       }
 
-      applyBackground(snap.background ?? '', snap.backgroundEffect ?? '')
-      if (snap.currentSceneId) await applyScene(String(snap.currentSceneId))
-      await applyRoles(snap.presentRoleIds ?? [], snap.currentRoleId ?? null)
+      applyBackground(snap.background ?? "", snap.backgroundEffect ?? "");
+      if (snap.currentSceneId) await applyScene(String(snap.currentSceneId));
+      await applyRoles(snap.presentRoleIds ?? [], snap.currentRoleId ?? null);
     } finally {
-      reconciling = false
+      reconciling = false;
     }
   }
 
   interface CastSnapshot {
-    background: string | null
-    backgroundEffect: string | null
-    currentSceneId: string | null
-    presentRoleIds: number[]
-    currentRoleId: number | null
+    background: string | null;
+    backgroundEffect: string | null;
+    currentSceneId: string | null;
+    presentRoleIds: number[];
+    currentRoleId: number | null;
   }
 
-  let reconcileTimer: ReturnType<typeof setInterval> | null = null
-  let unlistenMirror: UnlistenFn | null = null
-  let unlistenConfig: UnlistenFn | null = null
+  let reconcileTimer: ReturnType<typeof setInterval> | null = null;
+  let unlistenMirror: UnlistenFn | null = null;
+  let unlistenConfig: UnlistenFn | null = null;
 
   onMounted(async () => {
-    applyCastMute()
+    applyCastMute();
 
     // 先注册实时镜像监听，再播种历史镜像，避免中间漏掉主窗口的台词推进
-    unlistenMirror = await listen<CastMirror>('cast:mirror', (event) => {
-      applyMirror(event.payload)
-    })
+    unlistenMirror = await listen<CastMirror>("cast:mirror", (event) => {
+      applyMirror(event.payload);
+    });
     try {
-      const stored = await invoke<CastMirror | null>('cast_get_mirror')
-      if (stored) applyMirror(stored)
+      const stored = await invoke<CastMirror | null>("cast_get_mirror");
+      if (stored) applyMirror(stored);
     } catch (e) {
-      console.warn('[Cast] 读取投屏镜像失败：', e)
+      console.warn("[Cast] 读取投屏镜像失败：", e);
     }
 
     // 场景兜底对账（背景 / 场景 / 角色）
-    await reconcileFromSnapshot()
-    reconcileTimer = setInterval(reconcileFromSnapshot, 2000)
+    await reconcileFromSnapshot();
+    reconcileTimer = setInterval(reconcileFromSnapshot, 2000);
 
     // 调参初始值（窗口已打开时，设置页的改动经 cast:config 即时同步）
     try {
-      const status = await invoke<Partial<CastTune>>('cast_get_status')
-      applyTune(status)
+      const status = await invoke<Partial<CastTune>>("cast_get_status");
+      applyTune(status);
     } catch {
       /* ignore */
     }
 
     // 设置页调整角色/对话框参数 → cast:config 事件即时生效（此处兜底读取仅在挂载/重开时）
-    unlistenConfig = await listen<Partial<CastTune>>('cast:config', (event) => {
-      applyTune(event.payload ?? {})
-    })
-  })
+    unlistenConfig = await listen<Partial<CastTune>>("cast:config", (event) => {
+      applyTune(event.payload ?? {});
+    });
+  });
 
   onUnmounted(() => {
-    if (reconcileTimer) clearInterval(reconcileTimer)
-    unlistenMirror?.()
-    unlistenConfig?.()
-  })
+    if (reconcileTimer) clearInterval(reconcileTimer);
+    unlistenMirror?.();
+    unlistenConfig?.();
+  });
 </script>
 
 <style scoped>
@@ -419,7 +415,6 @@
   .cast-top-right :deep(h3) {
     display: block !important;
   }
-
 </style>
 
 <style>

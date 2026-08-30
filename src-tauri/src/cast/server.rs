@@ -15,13 +15,13 @@
 use std::time::Duration;
 
 use axum::{
+    Router,
     body::Body,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
     extract::{Path, Query, State as AxumState},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
-    Router,
 };
 use futures_util::StreamExt;
 use serde::Deserialize;
@@ -49,8 +49,7 @@ struct CastServerState {
 }
 
 /// 全局服务关闭信号（一次只跑一个投屏服务）。
-static SHUTDOWN_TX: std::sync::Mutex<Option<oneshot::Sender<()>>> =
-    std::sync::Mutex::new(None);
+static SHUTDOWN_TX: std::sync::Mutex<Option<oneshot::Sender<()>>> = std::sync::Mutex::new(None);
 
 /// 投屏 WS 客户端广播通道（服务端 → 客户端，如 `cast:audio` 语音播放帧）。
 /// 与 SHUTDOWN_TX 同生命周期：`start_server` 创建、`stop_server` 清空；
@@ -88,17 +87,13 @@ pub async fn start_server(
 
     let (tx, rx) = oneshot::channel::<()>();
     {
-        let mut guard = SHUTDOWN_TX
-            .lock()
-            .map_err(|e| format!("锁失败: {e}"))?;
+        let mut guard = SHUTDOWN_TX.lock().map_err(|e| format!("锁失败: {e}"))?;
         *guard = Some(tx);
     }
     // 建立服务端 → 客户端广播通道（cast:audio 等，均为 JSON 文本帧）
     let (broadcast_tx, _) = broadcast::channel::<String>(32);
     {
-        let mut guard = BROADCAST_TX
-            .lock()
-            .map_err(|e| format!("锁失败: {e}"))?;
+        let mut guard = BROADCAST_TX.lock().map_err(|e| format!("锁失败: {e}"))?;
         *guard = Some(broadcast_tx);
     }
 
@@ -118,9 +113,7 @@ pub async fn start_server(
 /// 停止投屏 HTTP 服务。
 pub async fn stop_server() -> Result<(), String> {
     let tx = {
-        let mut guard = SHUTDOWN_TX
-            .lock()
-            .map_err(|e| format!("锁失败: {e}"))?;
+        let mut guard = SHUTDOWN_TX.lock().map_err(|e| format!("锁失败: {e}"))?;
         guard.take()
     };
     if let Some(tx) = tx {
@@ -129,9 +122,7 @@ pub async fn stop_server() -> Result<(), String> {
     }
     // 关闭广播通道：已订阅连接的 rx 收到 Closed 自动断开发送支路
     {
-        let mut guard = BROADCAST_TX
-            .lock()
-            .map_err(|e| format!("锁失败: {e}"))?;
+        let mut guard = BROADCAST_TX.lock().map_err(|e| format!("锁失败: {e}"))?;
         *guard = None;
     }
     Ok(())
@@ -181,10 +172,7 @@ async fn stream_handler(
     Query(query): Query<StreamQuery>,
 ) -> Response {
     let fps = query.fps.unwrap_or(state.default_fps).clamp(1, 30);
-    let quality = query
-        .quality
-        .unwrap_or(state.default_quality)
-        .clamp(1, 100);
+    let quality = query.quality.unwrap_or(state.default_quality).clamp(1, 100);
     // 给了 w/h 则 letterbox 到目标尺寸；没给时读设置里的默认输出分辨率
     // （cast.width/height，0 = 按投屏窗口当前原生尺寸）。每路连接读一次，
     // 这样在设置页改分辨率后下一路连接即生效，无需重启串流服务。
@@ -198,7 +186,7 @@ async fn stream_handler(
             } else {
                 None
             }
-        }
+        },
     };
     let interval = Duration::from_millis(1000 / fps as u64);
     // vivid 色彩增强（复刻 cast_sender.py 的 --vivid 预设）。按连接读取设置，
@@ -213,9 +201,8 @@ async fn stream_handler(
     });
 
     // 消费端：组装 MJPEG 帧；2 秒无新帧则重发最近一帧保活
-    let body_stream = futures_util::stream::unfold(
-        (rx, None::<Vec<u8>>),
-        |(mut rx, mut last)| async move {
+    let body_stream =
+        futures_util::stream::unfold((rx, None::<Vec<u8>>), |(mut rx, mut last)| async move {
             let frame_bytes: Vec<u8> = loop {
                 let got = tokio::select! {
                     frame = rx.recv() => frame,
@@ -225,14 +212,14 @@ async fn stream_handler(
                     Some(bytes) => {
                         last = Some(bytes.clone());
                         break bytes;
-                    }
+                    },
                     None => {
                         if let Some(bytes) = &last {
                             break bytes.clone();
                         }
                         // 还没任何帧：继续等，不结束流
                         continue;
-                    }
+                    },
                 }
             };
             let mut part = Vec::with_capacity(frame_bytes.len() + 64);
@@ -245,9 +232,11 @@ async fn stream_handler(
             );
             part.extend_from_slice(&frame_bytes);
             part.extend_from_slice(b"\r\n");
-            Some((Ok::<_, std::io::Error>(bytes::Bytes::from(part)), (rx, last)))
-        },
-    );
+            Some((
+                Ok::<_, std::io::Error>(bytes::Bytes::from(part)),
+                (rx, last),
+            ))
+        });
 
     Response::builder()
         .header(
@@ -341,15 +330,18 @@ async fn handle_client_frame(
     match mic::on_frame(app, mic_buf, &action, format, data).await {
         Ok(Some(recognized)) => {
             // 识别成功：发给投屏窗口前端 → dispatch asr-send → sendMessage
-            let _ = app.emit("cast:mic:recognized", serde_json::json!({ "text": recognized }));
+            let _ = app.emit(
+                "cast:mic:recognized",
+                serde_json::json!({ "text": recognized }),
+            );
             send_ack(socket).await;
-        }
+        },
         Ok(None) => send_ack(socket).await,
         Err(e) => {
             tracing::warn!("[Cast][mic] 处理失败: {e}");
             let err = serde_json::json!({"type": "cast:mic", "error": e}).to_string();
             let _ = socket.send(Message::Text(err.into())).await;
-        }
+        },
     }
 }
 
@@ -442,9 +434,12 @@ fn normalize_voice_wav(bytes: &[u8]) -> Option<Vec<u8>> {
     let mut off = 12usize;
     while off + 8 <= bytes.len() {
         let id = &bytes[off..off + 4];
-        let size =
-            u32::from_le_bytes([bytes[off + 4], bytes[off + 5], bytes[off + 6], bytes[off + 7]])
-                as usize;
+        let size = u32::from_le_bytes([
+            bytes[off + 4],
+            bytes[off + 5],
+            bytes[off + 6],
+            bytes[off + 7],
+        ]) as usize;
         if id == FMT {
             if off + 8 + 16 <= bytes.len() {
                 let audio_format = u16::from_le_bytes([bytes[off + 8], bytes[off + 9]]);
@@ -562,7 +557,7 @@ async fn capture_loop(
             Some(bytes) => {
                 last = Some(bytes.clone());
                 bytes
-            }
+            },
             None => match &last {
                 Some(bytes) => bytes.clone(),
                 None => black_jpeg(target, quality),
@@ -592,7 +587,8 @@ mod tests {
 
     /// 构造一个 PCM WAV（可交错多声道）。
     fn make_wav(sample_rate: u32, channels: u16, bits: u16, samples: &[i16]) -> Vec<u8> {
-        let mut out = mic::build_wav_header((samples.len() * 2) as u32, sample_rate, channels, bits);
+        let mut out =
+            mic::build_wav_header((samples.len() * 2) as u32, sample_rate, channels, bits);
         for s in samples {
             out.extend_from_slice(&s.to_le_bytes());
         }
@@ -612,7 +608,12 @@ mod tests {
     #[test]
     fn wav_32k_downsample_16k() {
         // 32kHz 8 采样 → 16kHz 4 采样；ratio=2，取源 idx 0/2/4/6
-        let wav = make_wav(32_000, 1, 16, &[0, 1000, 2000, 3000, 4000, 5000, 6000, 7000]);
+        let wav = make_wav(
+            32_000,
+            1,
+            16,
+            &[0, 1000, 2000, 3000, 4000, 5000, 6000, 7000],
+        );
         let out = normalize_voice_wav(&wav).expect("应重采样");
         assert_eq!(out.len(), 44 + 4 * 2);
         assert_eq!(&out[0..4], b"RIFF");

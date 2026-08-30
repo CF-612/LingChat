@@ -125,7 +125,8 @@ pub fn open_cast_window(app: &AppHandle) -> Result<(), String> {
 
         if let Some(win) = app.get_webview_window(CAST_WINDOW_LABEL) {
             let _ = win.unminimize();
-            win.set_focus().map_err(|e| format!("聚焦投屏窗口失败: {e}"))?;
+            win.set_focus()
+                .map_err(|e| format!("聚焦投屏窗口失败: {e}"))?;
             return Ok(());
         }
 
@@ -184,10 +185,13 @@ pub async fn start_cast_server(app: &AppHandle, state: &CastManager) -> Result<u
     }
 
     let port = read_u64(app, config::keys::CAST_PORT, server::DEFAULT_PORT as u64) as u16;
-    let fps = read_u64(app, config::keys::CAST_FPS, server::DEFAULT_FPS as u64)
-        .clamp(1, 30) as u8;
-    let quality = read_u64(app, config::keys::CAST_QUALITY, server::DEFAULT_QUALITY as u64)
-        .clamp(1, 100) as u8;
+    let fps = read_u64(app, config::keys::CAST_FPS, server::DEFAULT_FPS as u64).clamp(1, 30) as u8;
+    let quality = read_u64(
+        app,
+        config::keys::CAST_QUALITY,
+        server::DEFAULT_QUALITY as u64,
+    )
+    .clamp(1, 100) as u8;
 
     let actual = server::start_server(app.clone(), port, fps, quality).await?;
 
@@ -243,10 +247,13 @@ pub async fn stop_cast_server(state: &CastManager) -> Result<(), String> {
 fn build_status(app: &AppHandle, state: &CastManager) -> CastStatusInfo {
     let enabled = read_bool(app, config::keys::CAST_ENABLED, false);
     let port = read_u64(app, config::keys::CAST_PORT, server::DEFAULT_PORT as u64) as u16;
-    let fps = read_u64(app, config::keys::CAST_FPS, server::DEFAULT_FPS as u64)
-        .clamp(1, 30) as u8;
-    let quality = read_u64(app, config::keys::CAST_QUALITY, server::DEFAULT_QUALITY as u64)
-        .clamp(1, 100) as u8;
+    let fps = read_u64(app, config::keys::CAST_FPS, server::DEFAULT_FPS as u64).clamp(1, 30) as u8;
+    let quality = read_u64(
+        app,
+        config::keys::CAST_QUALITY,
+        server::DEFAULT_QUALITY as u64,
+    )
+    .clamp(1, 100) as u8;
     // 串流默认输出分辨率（0 = 跟随投屏窗口当前尺寸）
     let width = read_u64(app, config::keys::CAST_WIDTH, 0) as u32;
     let height = read_u64(app, config::keys::CAST_HEIGHT, 0) as u32;
@@ -395,10 +402,7 @@ pub async fn cast_emit_mirror(
     mirror: serde_json::Value,
 ) -> Result<(), String> {
     {
-        let mut stored = state
-            .mirror
-            .lock()
-            .map_err(|e| format!("锁失败: {e}"))?;
+        let mut stored = state.mirror.lock().map_err(|e| format!("锁失败: {e}"))?;
         *stored = Some(mirror.clone());
     }
     app.emit("cast:mirror", mirror)

@@ -15,9 +15,7 @@ pub fn capture_cast_window(app: &tauri::AppHandle) -> Result<RgbaImage, String> 
     let win = app
         .get_webview_window("cast")
         .ok_or_else(|| "投屏窗口未打开".to_string())?;
-    let hwnd = win
-        .hwnd()
-        .map_err(|e| format!("获取窗口句柄失败: {e}"))?;
+    let hwnd = win.hwnd().map_err(|e| format!("获取窗口句柄失败: {e}"))?;
     // HWND.0 → *mut c_void → usize → u32（Windows 句柄是 32 位值）
     let id = hwnd.0 as usize as u32;
     tauri_plugin_screenshots::windows::capture_own_window(id)
@@ -43,8 +41,7 @@ pub fn resize_letterbox(img: &RgbaImage, w: u32, h: u32) -> RgbaImage {
     let scale = (w as f32 / src_w).min(h as f32 / src_h);
     let new_w = ((src_w * scale).round() as u32).max(1);
     let new_h = ((src_h * scale).round() as u32).max(1);
-    let resized =
-        image::imageops::resize(img, new_w, new_h, image::imageops::FilterType::Triangle);
+    let resized = image::imageops::resize(img, new_w, new_h, image::imageops::FilterType::Triangle);
     let mut canvas = image::RgbaImage::from_pixel(w, h, image::Rgba([0, 0, 0, 255]));
     let x = (w - new_w) / 2;
     let y = (h - new_h) / 2;
@@ -80,6 +77,7 @@ pub fn encode_jpeg(img: &RgbaImage, quality: u8) -> Result<Vec<u8>, String> {
     let mut out = Vec::new();
     let mut enc =
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, quality.clamp(1, 100));
-    enc.encode_image(img).map_err(|e| format!("JPEG 编码失败: {e}"))?;
+    enc.encode_image(img)
+        .map_err(|e| format!("JPEG 编码失败: {e}"))?;
     Ok(out)
 }

@@ -17,13 +17,13 @@
 //!   投屏窗口再走前端 sendMessage 注入对话；
 //! - 不接入 VAD / auto 模式，避免与主窗口本地 auto-listen 争抢单会话端点检测。
 
-use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use tokio::sync::Mutex as AsyncMutex;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use tauri::{AppHandle, Manager};
+use tokio::sync::Mutex as AsyncMutex;
 
-use crate::ai_service::asr::settings;
 use crate::AppState;
+use crate::ai_service::asr::settings;
 
 /// 一段待识别的音频缓冲（16kHz mono f32，跨 `data` 帧累积）。
 #[derive(Default)]
@@ -60,7 +60,7 @@ pub async fn on_frame(
                 format: format.map(str::to_owned),
             });
             Ok(None)
-        }
+        },
         "data" => {
             // 生效格式：start 协商值优先，其次帧内 format，最后兜底 pcm16。
             // 设备端只在 start 帧带 format，缺失/未知一律按唯一支持的 pcm16 处理，
@@ -76,7 +76,7 @@ pub async fn on_frame(
             let mic = buf.get_or_insert_with(MicBuffer::default);
             mic.pcm.extend_from_slice(&samples);
             Ok(None)
-        }
+        },
         "end" => {
             let Some(mic) = buf.as_mut() else {
                 return Ok(None);
@@ -90,7 +90,7 @@ pub async fn on_frame(
                 return Ok(None);
             }
             Ok(Some(text))
-        }
+        },
         _ => Ok(None),
     }
 }

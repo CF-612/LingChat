@@ -12,4 +12,4 @@ export default {
   log: "Logs",
   plugins: "Plugins",
   cast: "Cast",
-}
+};
