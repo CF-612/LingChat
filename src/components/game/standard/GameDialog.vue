@@ -1,10 +1,11 @@
 <template>
   <div
-    class="game-dialog relative z-2 flex w-full scrollbar-thin [scrollbar-color:var(--accent-color)_transparent]
-      justify-center p-3.75 transition-all duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
-      before:pointer-events-none before:absolute before:-top-10 before:right-0 before:left-0
-      before:h-10 before:bg-linear-to-b before:from-transparent before:via-[rgba(0,14,39,0.3)]
-      before:to-[rgba(0,14,39,0.6)] before:content-['']"
+    class="game-dialog relative z-2 flex w-full scrollbar-thin
+      [scrollbar-color:var(--accent-color)_transparent] justify-center p-3.75 transition-all
+      duration-200 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] before:pointer-events-none
+      before:absolute before:-top-10 before:right-0 before:left-0 before:h-10 before:bg-linear-to-b
+      before:from-transparent before:via-[rgba(0,14,39,0.3)] before:to-[rgba(0,14,39,0.6)]
+      before:content-['']"
     :class="{
       [`z-[-1]! overflow-hidden opacity-0 duration-500! ease-linear before:opacity-0
       before:duration-1000!`]: isHidden,
@@ -92,8 +93,7 @@
                     :icon="micIcon"
                     :title="micTitle"
                     :class="{
-                      [`animate-asr-breathe
-                      text-blue-500`]: asrInput.phase.value === 'recording',
+                      'animate-asr-breathe text-blue-500': asrInput.phase.value === 'recording',
                     }"
                     :disabled="!canStartMic"
                     @click="toggleRecording"
@@ -184,8 +184,7 @@
                 :icon="micIcon"
                 :title="micTitle"
                 :class="{
-                  [`animate-asr-breathe
-                  text-blue-500`]: asrInput.phase.value === 'recording',
+                  'animate-asr-breathe text-blue-500': asrInput.phase.value === 'recording',
                 }"
                 :disabled="!canStartMic"
                 @click="onMobileMenuAction(toggleRecording)"
@@ -235,8 +234,8 @@
             v-show="currentStatus === 'responding'"
             ref="inlineDisplayRef"
             tabindex="0"
-            class="response-display my-1.25 max-h-[50dvh] min-h-30 flex-1 resize-none overflow-y-auto
-              border-none bg-transparent font-[inherit] text-xl font-bold break-all
+            class="response-display my-1.25 max-h-[50dvh] min-h-30 flex-1 resize-none
+              overflow-y-auto border-none bg-transparent font-[inherit] text-xl font-bold break-all
               whitespace-pre-line outline-none text-shadow-[inherit]"
             @keydown.enter.exact.prevent="sendOrContinue"
           >
@@ -246,7 +245,7 @@
             <div
               ref="motionLineRef"
               class="whitespace-pre-line text-[#9ca3af]"
-              :class="{ 'italic text-base': isShowingMotionText }"
+              :class="{ 'text-base italic': isShowingMotionText }"
             ></div>
           </div>
 
@@ -256,8 +255,8 @@
             id="inputMessage"
             ref="textareaRef"
             class="my-1.25 max-h-[50dvh] min-h-30 flex-1 resize-none border-none bg-transparent
-              font-[inherit] text-[max(1.25rem,16px)] font-bold transition-all duration-300 outline-none
-              text-shadow-[inherit] placeholder:text-white/50 placeholder:shadow-none"
+              font-[inherit] text-[max(1.25rem,16px)] font-bold transition-all duration-300
+              outline-none text-shadow-[inherit] placeholder:text-white/50 placeholder:shadow-none"
             :placeholder="placeholderText"
             v-model="inputMessage"
             @keydown.enter.exact.prevent="sendOrContinue"
@@ -288,27 +287,27 @@
   import { computed, onMounted, onUnmounted, ref, watch } from "vue";
   import { useI18n } from "vue-i18n";
   import { useTypeWriter } from "../../../composables/ui/useTypeWriter";
+  import {
+    ASR_AUTO_SEND_DELAY_MS,
+    asrVoiceActive,
+    lockAsrForDisplay,
+    registerAsrInputBridge,
+    setMobileMenuOpen,
+    useAsrInput,
+  } from "../../../composables/useAsrInput";
   import { setInputHasText } from "../../../composables/useCanDeliver";
   import { useDialogAppearance } from "../../../composables/useDialogAppearance";
-  import { eventQueue } from "../../../core/events/event-queue";
   import { dialogueMerge } from "../../../core/events/dialogue-merge";
+  import { eventQueue } from "../../../core/events/event-queue";
   import { useGameStore } from "../../../stores/modules/game";
   import { useLlmProvidersStore } from "../../../stores/modules/llm-providers";
   import { useSettingsStore } from "../../../stores/modules/settings";
+  import { useAsrStore } from "../../../stores/modules/settings/asr";
   import { useDialogStore } from "../../../stores/modules/ui/dialog";
   import { useUIStore } from "../../../stores/modules/ui/ui";
   import { escapeHtml } from "../../../utils/escapeHtml";
   import { createCharRevealWriter } from "../../../utils/typewriter/charReveal";
   import { TypeWriter } from "../../../utils/typewriter/TypeWriter";
-  import {
-    useAsrInput,
-    setMobileMenuOpen,
-    lockAsrForDisplay,
-    registerAsrInputBridge,
-    asrVoiceActive,
-    ASR_AUTO_SEND_DELAY_MS,
-  } from "../../../composables/useAsrInput";
-  import { useAsrStore } from "../../../stores/modules/settings/asr";
   import { Button } from "../../base";
 
   const inputMessage = ref("");
@@ -344,7 +343,7 @@
 
   // 标题栏（角色名 + 副标题）切换 key：任一变化时整体一起滑出/滑入
   const titleSubtitleKey = computed(
-    () => `${uiStore.showCharacterTitle}|${uiStore.showCharacterSubtitle}`,
+    () => `${uiStore.showCharacterTitle}|${uiStore.showCharacterSubtitle}`
   );
 
   // 语音输入：useAsrInput 统一两种触发源（mic 按钮 / 自动监听），
@@ -380,7 +379,7 @@
     () =>
       (autoListenOn.value && asrStore.settings.voice_input_enabled) ||
       asrInput.phase.value === "recording" ||
-      asrInput.canStartAsr(false, true),
+      asrInput.canStartAsr(false, true)
   );
 
   // 截图相关状态
@@ -430,7 +429,10 @@
   // 标准模式=全部段（动作由 continueDialog Phase 2 走 charReveal 打字）。台词段间空格已在 append 时烙进段文本。
   function typedText(segs: DisplaySegment[] = segments): string {
     if (settingsStore.text.inlineMotionText) {
-      return segs.filter((s) => s.kind === "dialogue").map((s) => s.text).join("");
+      return segs
+        .filter((s) => s.kind === "dialogue")
+        .map((s) => s.text)
+        .join("");
     }
     return segs.map((s) => s.text).join("");
   }
@@ -478,10 +480,12 @@
     if (!settingsStore.text.inlineMotionText || settingsStore.text.mergeLineThreshold <= 0) {
       return;
     }
-    if (appendedLine.length > settingsStore.text.mergeLineThreshold) return;
     const next = eventQueue.peek();
     if (!next || next.type !== "reply") return;
     if (next.roleId !== gameStore.currentInteractRoleId) return;
+    if (dialogueMerge.mergedLength + next.message.length > settingsStore.text.mergeLineThreshold)
+      return;
+
     dialogueMerge.armed = true;
     dialogueMerge.armedRoleId = next.roleId;
   }
@@ -626,7 +630,7 @@
   });
 
   const isInputEnabled = computed(
-    () => gameStore.currentStatus === "input" && !asrVoiceActive.value,
+    () => gameStore.currentStatus === "input" && !asrVoiceActive.value
   );
 
   watch(
@@ -698,20 +702,24 @@
           appendTyping(typedText(newSegs));
           // 链式合并：刚追加的这行若仍满足合并条件、且队头下一条也是同角色短句，
           // 继续武装，让 MainChat 在本行展示完成后再次自动续打下一条——突破只融合两句的限制。
+          dialogueMerge.mergedLength += newLine.length;
           rearmNextMerge(newLine);
         } else {
           // 全新台词：重置显示区 + 从 0 打字（台词与动作区并行逐字打字）
           isShowingMotionText.value = false;
           segments = buildSegments(newLine);
+          dialogueMerge.mergedLength = newLine.length;
           resetResponseDisplay();
           startTyping(typedText(), uiStore.typeWriterSpeed);
           if (settingsStore.text.inlineMotionText && uiStore.showCharacterMotionText) {
             startMotionTyping(uiStore.showCharacterMotionText, uiStore.typeWriterSpeed);
           }
+          rearmNextMerge(newLine);
         }
       } else if (newStatus === "input") {
         stopTyping();
         stopMotionTyping();
+        dialogueMerge.mergedLength = 0;
         isShowingMotionText.value = false;
         inputMessage.value = "";
         currentDisplayedText.value = "";
