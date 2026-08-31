@@ -173,7 +173,8 @@
             </h3>
             <div
               v-if="clothes?.length"
-              class="clothes-scroll flex snap-x gap-4 overflow-x-auto pb-2"
+              class="scrollbar-themed flex snap-x gap-4 overflow-x-auto pb-2"
+              style="--scrollbar-size: 8px"
             >
               <div
                 v-for="cloth in clothes"
@@ -367,30 +368,8 @@
   }
 
   /* 隐藏滚动条但允许滚动 */
-  .overflow-x-auto::-webkit-scrollbar,
-  .overflow-y-auto::-webkit-scrollbar {
+  .overflow-x-auto:not(.scrollbar-themed)::-webkit-scrollbar,
+  .overflow-y-auto:not(.scrollbar-themed)::-webkit-scrollbar {
     display: none;
-  }
-
-  /* 服装横向列表保留可见滚动条，方便拖动查看后续服装。 */
-  .clothes-scroll {
-    padding-bottom: 8px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(129, 140, 248, 0.55) rgba(255, 255, 255, 0.06);
-  }
-  .clothes-scroll::-webkit-scrollbar {
-    display: block;
-    height: 8px;
-  }
-  .clothes-scroll::-webkit-scrollbar-track {
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.06);
-  }
-  .clothes-scroll::-webkit-scrollbar-thumb {
-    border-radius: 20px;
-    background-color: rgba(129, 140, 248, 0.55);
-  }
-  .clothes-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(129, 140, 248, 0.8);
   }
 </style>

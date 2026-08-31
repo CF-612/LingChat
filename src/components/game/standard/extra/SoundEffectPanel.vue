@@ -29,7 +29,7 @@
       <div
         v-if="panelVisible"
         ref="panelRef"
-        class="custom-scrollbar fixed bottom-[calc(64px+var(--safe-area-inset-bottom))] left-4
+        class="scrollbar-themed fixed bottom-[calc(64px+var(--safe-area-inset-bottom))] left-4
           z-[1000] box-border max-h-[80dvh] w-[520px] overflow-y-auto rounded-3xl border
           border-white/10 bg-[#12121c]/75 p-4 text-white shadow-[0_8px_32px_rgba(0,0,0,0.4)]
           backdrop-blur-[20px]"
@@ -121,7 +121,7 @@
               <div v-if="bgmList.length === 0" class="py-4 text-center text-xs text-gray-500">
                 {{ $t("game.soundPanel.emptyMusicList") }}
               </div>
-              <div v-else class="custom-scrollbar max-h-32 space-y-0.5 overflow-y-auto p-1">
+              <div v-else class="scrollbar-themed max-h-32 space-y-0.5 overflow-y-auto p-1">
                 <div
                   v-for="music in bgmList"
                   :key="music.url"
@@ -231,7 +231,7 @@
               $t("game.soundPanel.availableAmbient")
             }}</span>
             <div class="overflow-hidden rounded-xl border border-white/5 bg-white/[0.03]">
-              <div class="custom-scrollbar max-h-28 space-y-0.5 overflow-y-auto p-1">
+              <div class="scrollbar-themed max-h-28 space-y-0.5 overflow-y-auto p-1">
                 <div
                   v-for="ambient in ambientFileList"
                   :key="ambient.url"
@@ -450,21 +450,6 @@
 </script>
 
 <style scoped>
-  /* 自定义滚动条 */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.15);
-    border-radius: 20px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-  }
-
   /* 音量滑块样式 */
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;

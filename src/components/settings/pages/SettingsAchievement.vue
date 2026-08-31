@@ -1,5 +1,5 @@
 <template>
-  <MenuPage>
+  <MenuPage class="scrollbar-themed">
     <MenuItem :title="$t('settings.achievement.title')">
       <template #header>
         <Award :size="20" />
@@ -192,23 +192,6 @@
 </script>
 
 <style scoped>
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-  }
-
   .text-shadow-sm {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   }

@@ -180,7 +180,7 @@
         <div v-if="musicList.length === 0" class="py-8 text-center text-sm text-gray-400">
           {{ $t("settings.sound.bgm.empty") }}
         </div>
-        <div v-else class="custom-scrollbar max-h-52 space-y-1 overflow-y-auto p-1.5">
+        <div v-else class="scrollbar-themed max-h-52 space-y-1 overflow-y-auto p-1.5">
           <div
             v-for="music in musicList"
             :key="music.url"
@@ -259,7 +259,7 @@
         <div v-if="ambientFileList.length === 0" class="py-4 text-center text-sm text-gray-400">
           {{ $t("settings.sound.ambient.empty") }}
         </div>
-        <div v-else class="custom-scrollbar max-h-32 space-y-1 overflow-y-auto p-1.5">
+        <div v-else class="scrollbar-themed max-h-32 space-y-1 overflow-y-auto p-1.5">
           <div
             v-for="ambient in ambientFileList"
             :key="ambient.url"
@@ -338,7 +338,7 @@
         >
           {{ $t("settings.sound.ambient.noPlaying") }}
         </div>
-        <div v-else class="custom-scrollbar max-h-48 space-y-1 overflow-y-auto p-1.5">
+        <div v-else class="scrollbar-themed max-h-48 space-y-1 overflow-y-auto p-1.5">
           <div
             v-for="track in uiStore.ambientTracks"
             :key="track.id"
@@ -965,20 +965,5 @@
   .output-device-select option:checked {
     background-color: #3b82f6;
     color: #ffffff;
-  }
-
-  /* 仅保留无法用简短 Tailwind 涵盖的自定义滚动条样式 */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 20px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.4);
   }
 </style>
