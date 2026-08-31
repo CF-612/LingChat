@@ -10,6 +10,19 @@
     >
       <Cat :size="20" />
     </div>
+    <button
+      class="absolute top-2 left-2 z-10 rounded-lg bg-black/5 p-1.5 opacity-0 transition-all
+        group-hover:opacity-100"
+      @click.stop="handleToggleFavored"
+      :title="isCharFavored(id) ? $t('ui.characterCard.unfav') : $t('ui.characterCard.fav')"
+    >
+      <Star
+        :size="16"
+        :class="
+          isCharFavored(id) ? 'fill-amber-400 text-amber-400' : 'text-white/60 hover:text-white'
+        "
+      />
+    </button>
     <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
       <RoleExportMenu :role-id="id" :role-name="name" />
       <button
@@ -235,7 +248,7 @@
   import { useGameStore } from "@/stores/modules/game";
   import { applyWebInitData } from "@/stores/modules/game/actions";
   import { useDialogStore } from "@/stores/modules/ui/dialog";
-  import { Settings } from "lucide-vue-next";
+  import { Settings, Star } from "lucide-vue-next";
   import { Cat, Check } from "lucide-vue-next";
   import type { Clothes } from "@/types";
 
@@ -260,11 +273,38 @@
     resourceFolder: "",
   });
 
-  const emit = defineEmits(["saved"]);
+  const emit = defineEmits(["saved", "favoredChange"]);
 
   // 状态管理
   const isDetailVisible = ref(false);
   const isSettingsModalVisible = ref(false);
+  const CHARACTER_FAVORED_KEY = "lingchat.character.favored.v1";
+  const favoredTick = ref(0);
+  function loadCharFavored(): number[] {
+    try {
+      const raw = localStorage.getItem(CHARACTER_FAVORED_KEY);
+      return raw ? (JSON.parse(raw) as number[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  function isCharFavored(id: number): boolean {
+    void favoredTick.value;
+    return loadCharFavored().includes(id);
+  }
+  function handleToggleFavored(): void {
+    let favored = loadCharFavored();
+    favored = favored.includes(props.id)
+      ? favored.filter((id) => id !== props.id)
+      : [...favored, props.id];
+    try {
+      localStorage.setItem(CHARACTER_FAVORED_KEY, JSON.stringify(favored));
+    } catch {
+      // 本地存储不可用时保留当前页面功能。
+    }
+    favoredTick.value++;
+    emit("favoredChange");
+  }
 
   const { t } = useI18n();
   const gameStore = useGameStore();
