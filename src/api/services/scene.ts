@@ -28,6 +28,8 @@ export interface SceneInfo {
   scene_name: string;
   scene_description: string;
   background: string | null;
+  /** 场景所属子分类（背景子文件夹名；根目录为「根目录」） */
+  category: string;
   lighting: LightingParams | null;
   created_at: string;
   updated_at: string;

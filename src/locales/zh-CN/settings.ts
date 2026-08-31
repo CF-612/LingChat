@@ -685,6 +685,7 @@ export default {
       refreshDone: "刷新完成",
       refreshDoneMsg: "场景已同步",
       refreshFail: "刷新失败",
+      refreshConfirm: "刷新场景将清理背景文件已丢失的空白场景，并重新扫描背景。确定继续吗？",
       moveToTitle: "移动到子分类",
       moveToRoot: "根目录",
       moveNoCategory: "暂无子分类，请先在分类栏新建",
@@ -704,6 +705,7 @@ export default {
       empty: "暂无场景可排序",
       favoredZone: "收藏区",
       unfavoredZone: "未收藏区",
+      onlyAll: "请先切换到「全部」分类后再调整场景排序。",
     },
     pagination: {
       first: "← 首页",

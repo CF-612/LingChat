@@ -42,7 +42,14 @@ pub(crate) fn collect_background_files_recursive_pub(
     if let Ok(entries) = fs::read_dir(base) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
+            // 不跟随符号链接 / Junction，避免越界扫描与循环。
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_file() {
                 let is_bg = path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -51,7 +58,7 @@ pub(crate) fn collect_background_files_recursive_pub(
                 if is_bg {
                     out.push(path);
                 }
-            } else if path.is_dir() {
+            } else if file_type.is_dir() {
                 collect_background_files_recursive_pub(&path, out);
             }
         }
@@ -72,7 +79,13 @@ fn collect_backgrounds_recursive(
     if let Ok(entries) = fs::read_dir(base) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_file() {
                 let is_bg = path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -81,7 +94,7 @@ fn collect_backgrounds_recursive(
                 if is_bg {
                     out.push((path, category.to_string()));
                 }
-            } else if path.is_dir() {
+            } else if file_type.is_dir() {
                 let sub_cat = path
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
@@ -183,7 +196,13 @@ pub fn list_background_categories() -> Result<Vec<String>, String> {
             if let Ok(entries) = fs::read_dir(base) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.is_dir() {
+                    let Ok(file_type) = entry.file_type() else {
+                        continue;
+                    };
+                    if file_type.is_symlink() {
+                        continue;
+                    }
+                    if file_type.is_dir() {
                         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                             cats.insert(name.to_string());
                         }
@@ -251,6 +270,9 @@ pub fn delete_background_category(name: String, mode: String) -> Result<usize, S
     } else {
         return Err(format!("无效的分类删除模式: {mode}"));
     };
+
+    // 同步引用该分类背景的场景，避免 scenes.json 与背景目录脱节。
+    super::scene::sync_scenes_after_background_category_change(&bg_dir, &safe, &mode)?;
 
     Ok(affected)
 }

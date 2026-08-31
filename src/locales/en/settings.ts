@@ -682,6 +682,8 @@ export default {
       refreshDone: "Refreshed",
       refreshDoneMsg: "Scenes synced",
       refreshFail: "Refresh failed",
+      refreshConfirm:
+        "Refreshing will remove scenes whose background files are missing, then rescan the background folder. Continue?",
       moveToTitle: "Move to subcategory",
       moveToRoot: "Root",
       moveNoCategory: "No subcategory yet, create one in the category bar above",
@@ -699,6 +701,7 @@ export default {
       empty: "No scenes to sort",
       favoredZone: "Favorites",
       unfavoredZone: "Others",
+      onlyAll: 'Switch to the "All" category before adjusting scene order.',
     },
     pagination: {
       first: "← First",

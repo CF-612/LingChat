@@ -651,6 +651,7 @@ export default {
       refreshDone: "刷新完成",
       refreshDoneMsg: "場景已同步",
       refreshFail: "刷新失敗",
+      refreshConfirm: "刷新場景會清理背景檔案已遺失嘅空白場景，並重新掃描背景。確定繼續咩？",
       moveToTitle: "移動到子分類",
       moveToRoot: "根目錄",
       moveNoCategory: "暫無子分類，請先在分類欄新建",
@@ -668,6 +669,7 @@ export default {
       empty: "暫無場景可排序",
       favoredZone: "收藏區",
       unfavoredZone: "未收藏區",
+      onlyAll: "請先切換到「全部」分類再調整場景排序。",
     },
     pagination: {
       first: "← 首頁",

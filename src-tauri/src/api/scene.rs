@@ -479,13 +479,18 @@ pub async fn clear_empty_scenes(app: AppHandle) -> Result<usize, String> {
     let before = scenes.len();
     let bg_base = super::backgrounds_dir();
     let (_, background_index) = scan_backgrounds(&bg_base);
-    // 保留能精确解析的场景；同名歧义不会误绑定到任意文件。
+    // 保留：① 空背景/未设置背景的合法场景；② 能够精确解析（含正面命中）的场景；
+    // ③ 同名文件存在多个候选（歧义）的场景（resolve 返回 Err，不应误删）。
+    // 仅删除：声明了背景但物理文件已不存在（resolve 返回 Ok(None)）的场景。
     scenes.retain(|scene| {
-        background_index
-            .resolve(&scene.background, &scene.category)
-            .ok()
-            .flatten()
-            .is_some()
+        if scene.background.trim().is_empty() {
+            return true;
+        }
+        match background_index.resolve(&scene.background, &scene.category) {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(_) => true,
+        }
     });
     let removed = before - scenes.len();
 
@@ -507,6 +512,79 @@ pub async fn clear_empty_scenes(app: AppHandle) -> Result<usize, String> {
     }
 
     Ok(removed)
+}
+
+/// 删除/迁移背景分类后同步 scenes.json。
+///
+/// - `move_to_root`：把引用该分类下背景的相对路径改为纯文件名，category 设为「根目录」。
+/// - `delete_all`：删除后若背景还能解析到其他候选则更新为新的相对路径；
+///   若彻底丢失则清空背景（保留空背景场景）；歧义时保留场景并把 category 回「根目录」。
+pub(crate) fn sync_scenes_after_background_category_change(
+    bg_base: &Path,
+    category: &str,
+    mode: &str,
+) -> Result<(), String> {
+    let store = SceneStore::new(&data_dir());
+    let mut scenes = store
+        .load_all()
+        .map_err(|e| format!("读取场景列表失败: {}", e))?;
+    let mut dirty = false;
+
+    let prefix = format!("{category}/");
+
+    if mode == "move_to_root" {
+        for scene in scenes.iter_mut() {
+            if scene.plugin_id.is_some() {
+                continue;
+            }
+            if !scene.background.starts_with(&prefix) {
+                continue;
+            }
+            scene.background = to_background_filename(&scene.background);
+            scene.category = "根目录".to_string();
+            scene.updated_at = now_iso();
+            dirty = true;
+        }
+    } else if mode == "delete_all" {
+        let (_, remaining_index) = scan_backgrounds(bg_base);
+        for scene in scenes.iter_mut() {
+            if scene.plugin_id.is_some() {
+                continue;
+            }
+            if !scene.background.starts_with(&prefix) {
+                continue;
+            }
+            match remaining_index.resolve(&scene.background, &scene.category) {
+                Ok(Some(path)) => {
+                    if let Some(relative) = relative_storage_path(&path, bg_base) {
+                        let category = category_from_storage_path(&relative);
+                        scene.background = relative;
+                        scene.category = category;
+                    }
+                },
+                Err(_) => {
+                    // 歧义：保留场景与背景引用，但分类回「根目录」避免指向已删除分类。
+                    scene.category = "根目录".to_string();
+                },
+                Ok(None) => {
+                    // 背景文件已彻底丢失：保留空背景场景，但清空背景引用。
+                    scene.background = String::new();
+                    scene.category = "根目录".to_string();
+                },
+            }
+            scene.updated_at = now_iso();
+            dirty = true;
+        }
+    } else {
+        return Err(format!("无效的分类删除模式: {mode}"));
+    }
+
+    if dirty {
+        store
+            .save_all(&scenes)
+            .map_err(|e| format!("同步场景列表失败: {}", e))?;
+    }
+    Ok(())
 }
 
 /// 把某个场景的背景文件移动到目标子分类（子文件夹）。
@@ -568,10 +646,24 @@ pub async fn move_scene_to_category(
         std::fs::rename(&src, &dest).map_err(|e| format!("移动背景文件失败: {e}"))?;
     }
 
-    scenes[idx].category = target.clone();
-    scenes[idx].background = relative_storage_path(&dest, &bg_base)
+    // 多个场景可能共享同一个背景文件。文件物理移动后，需要同步更新所有
+    // 解析到该文件（src）的本地场景，避免其余场景的背景路径/分类失效。
+    let moved_relative = relative_storage_path(&dest, &bg_base)
         .ok_or_else(|| "移动后的背景路径不在背景目录内".to_string())?;
-    scenes[idx].updated_at = now_iso();
+    let now = now_iso();
+    for scene in scenes.iter_mut() {
+        if scene.plugin_id.is_some() {
+            continue;
+        }
+        let Ok(Some(path)) = background_index.resolve(&scene.background, &scene.category) else {
+            continue;
+        };
+        if path == src {
+            scene.background = moved_relative.clone();
+            scene.category = target.clone();
+            scene.updated_at = now.clone();
+        }
+    }
     let info = model_to_info(&scenes[idx]);
     store
         .save_all(&scenes)

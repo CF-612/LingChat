@@ -1373,7 +1373,13 @@
   const draggingIndex = ref(-1);
   const overIndex = ref(-1);
 
-  function openSortModal(): void {
+  async function openSortModal(): Promise<void> {
+    // 全局收藏与排序键是跨分类的，在子分类下保存会用当前子集覆盖全局，
+    // 因此只允许在「全部」分类下调整全局排序。
+    if (currentBackgroundCategory.value !== "全部") {
+      await dialogStore.alert(t("settings.background.sort.onlyAll"));
+      return;
+    }
     const all = filteredScenes.value;
     sortItems.value = all.map((s) => ({ ...s }));
     showSortModal.value = true;
@@ -1443,6 +1449,8 @@
 
   // ── 刷新：删除空场景 + 刷新背景 + 刷新列表（合并为一个按钮）──
   async function handleRefreshScenes(): Promise<void> {
+    const confirmed = await dialogStore.confirm(t("settings.background.scene.refreshConfirm"));
+    if (!confirmed) return;
     try {
       const removed = await clearEmptyScenes();
       await refreshBackground();

@@ -666,6 +666,8 @@ export default {
       refreshDone: "更新完了",
       refreshDoneMsg: "シーンを同期しました",
       refreshFail: "更新に失敗しました",
+      refreshConfirm:
+        "シーンを更新すると、背景ファイルが存在しないシーンを削除し、背景フォルダーを再スキャンします。続行しますか？",
       moveToTitle: "サブカテゴリへ移動",
       moveToRoot: "ルート",
       moveNoCategory: "サブカテゴリがありません。上の分類バーで作成してください",
@@ -683,6 +685,7 @@ export default {
       empty: "並び替えるシーンがありません",
       favoredZone: "お気に入り",
       unfavoredZone: "お気に入り以外",
+      onlyAll: "シーン順を変更する前に「すべて」カテゴリに切り替えてください。",
     },
     pagination: {
       first: "← 最初",

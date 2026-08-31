@@ -54,11 +54,17 @@ fn collect_music_recursive(
     if !base.exists() {
         return;
     }
-    let allowed_extensions = ["mp3", "wav", "flac", "webm", "weba", "ogg", "m4a", "oga"];
+    let allowed_extensions = ["mp3", "wav", "flac", "webm", "weba", "ogg", "oga"];
     if let Ok(entries) = fs::read_dir(base) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            if file_type.is_file() {
                 let is_music = path
                     .extension()
                     .and_then(|e| e.to_str())
@@ -67,7 +73,7 @@ fn collect_music_recursive(
                 if is_music {
                     out.push((path, category.to_string()));
                 }
-            } else if path.is_dir() {
+            } else if file_type.is_dir() {
                 let sub_cat = path
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
@@ -166,7 +172,13 @@ pub fn list_music_categories() -> Result<Vec<String>, String> {
             if let Ok(entries) = fs::read_dir(base) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.is_dir() {
+                    let Ok(file_type) = entry.file_type() else {
+                        continue;
+                    };
+                    if file_type.is_symlink() {
+                        continue;
+                    }
+                    if file_type.is_dir() {
                         if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                             cats.insert(name.to_string());
                         }

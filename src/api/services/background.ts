@@ -78,8 +78,3 @@ export const deleteBackgroundCategory = async (
   const data = await invoke<number>("delete_background_category", { name, mode });
   return data ?? 0;
 };
-
-/** 保存背景排序顺序（按顺序排列的背景文件名数组） */
-export const saveBackgroundOrder = async (order: string[]): Promise<void> => {
-  await invoke("save_background_order", { order });
-};
