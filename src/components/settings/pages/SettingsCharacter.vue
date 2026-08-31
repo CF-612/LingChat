@@ -18,8 +18,9 @@
           :clothes="character.clothes || []"
           :resource-folder="character.resourceFolder"
           :source="character.source"
+          :favored="favoredCharacterIds.includes(character.id)"
           @saved="handleSettingsSaved"
-          @favoredChange="applyCharacterFavoriteOrder"
+          @favoredChange="handleCharacterFavoriteChange"
         />
       </div>
 
@@ -122,6 +123,10 @@
   import { Button } from "../../base";
   import { MenuItem, MenuPage } from "../../ui";
   import { characterGetAll } from "../../../api/services/character";
+  import {
+    getCharacterFavorites,
+    saveCharacterFavorites,
+  } from "../../../api/services/character-favorites";
   import { useRoleImportExport } from "../../../composables/useRoleImportExport";
   import type { ConflictPolicy } from "../../../api/services/role-archive";
   import { useGameStore } from "../../../stores/modules/game";
@@ -147,17 +152,19 @@
   const allCharacters = ref<CharacterCardData[]>([]);
   const currentPage = ref(1);
   const totalPages = ref(1);
-  const CHARACTER_FAVORED_KEY = "lingchat.character.favored.v1";
+  const favoredCharacterIds = ref<number[]>([]);
   const PAGE_SIZE = 6;
   const FETCH_ALL_PAGE_SIZE = 1000;
-  function loadCharFavored(): number[] {
+
+  async function loadCharacterFavorites(): Promise<void> {
     try {
-      const raw = localStorage.getItem(CHARACTER_FAVORED_KEY);
-      return raw ? (JSON.parse(raw) as number[]) : [];
-    } catch {
-      return [];
+      favoredCharacterIds.value = await getCharacterFavorites();
+    } catch (error) {
+      console.error("读取角色收藏失败:", error);
+      favoredCharacterIds.value = [];
     }
   }
+
   function paginate(page: number): void {
     const pages = Math.max(1, Math.ceil(allCharacters.value.length / PAGE_SIZE));
     totalPages.value = pages;
@@ -166,14 +173,30 @@
     characters.value = allCharacters.value.slice(start, start + PAGE_SIZE);
   }
   function applyCharacterFavoriteOrder(): void {
-    const favored = loadCharFavored();
-    const favoredSet = new Set(favored);
-    const favoredCharacters = favored
+    const favoredSet = new Set(favoredCharacterIds.value);
+    const favoredCharacters = favoredCharacterIds.value
       .map((id) => allCharacters.value.find((character) => character.id === id))
       .filter((character): character is CharacterCardData => Boolean(character));
     const others = allCharacters.value.filter((character) => !favoredSet.has(character.id));
     allCharacters.value = [...favoredCharacters, ...others];
     paginate(currentPage.value);
+  }
+
+  async function handleCharacterFavoriteChange(characterId: number): Promise<void> {
+    const previous = favoredCharacterIds.value;
+    const next = previous.includes(characterId)
+      ? previous.filter((id) => id !== characterId)
+      : [...previous, characterId];
+    favoredCharacterIds.value = next;
+    applyCharacterFavoriteOrder();
+
+    try {
+      await saveCharacterFavorites(next);
+    } catch (error) {
+      console.error("保存角色收藏失败:", error);
+      favoredCharacterIds.value = previous;
+      applyCharacterFavoriteOrder();
+    }
   }
   const gameStore = useGameStore();
   const uiStore = useUIStore();
@@ -214,6 +237,7 @@
   };
 
   const loadCharacters = async (): Promise<void> => {
+    await loadCharacterFavorites();
     await fetchCharacters();
   };
 
