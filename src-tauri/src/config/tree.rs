@@ -385,6 +385,24 @@ pub fn build_config_tree(app: &AppHandle) -> ConfigTree {
                         description: "OpenTTS voice / 音色标识".to_string(),
                         setting_type: "text".to_string(),
                     },
+                    ConfigSetting {
+                        key: keys::COSYVOICE_API_KEY.to_string(),
+                        value: read_setting(app, keys::COSYVOICE_API_KEY, ""),
+                        description: "CosyVoice 云 API 密钥（语音克隆）".to_string(),
+                        setting_type: "text".to_string(),
+                    },
+                    ConfigSetting {
+                        key: keys::COSYVOICE_MODELS.to_string(),
+                        value: read_setting(app, keys::COSYVOICE_MODELS, ""),
+                        description: "CosyVoice 模型列表（JSON 数组）".to_string(),
+                        setting_type: "text".to_string(),
+                    },
+                    ConfigSetting {
+                        key: keys::COSYVOICE_VOICES.to_string(),
+                        value: read_setting(app, keys::COSYVOICE_VOICES, ""),
+                        description: "CosyVoice 音色映射（JSON 数组）".to_string(),
+                        setting_type: "text".to_string(),
+                    },
                 ],
             },
         );
@@ -652,15 +670,13 @@ pub fn build_config_tree(app: &AppHandle) -> ConfigTree {
             "开机自启动".to_string(),
             Subcategory {
                 description: "开机后自动启动 LingChat".to_string(),
-                settings: vec![
-                    ConfigSetting {
-                        key: keys::AUTOSTART_BOOT_AS_PET.to_string(),
-                        value: read_setting(app, keys::AUTOSTART_BOOT_AS_PET, "false"),
-                        description:
-                            "开启桌宠：开机自启动时以桌宠模式进入（仅 Windows 可用）".to_string(),
-                        setting_type: "bool".to_string(),
-                    },
-                ],
+                settings: vec![ConfigSetting {
+                    key: keys::AUTOSTART_BOOT_AS_PET.to_string(),
+                    value: read_setting(app, keys::AUTOSTART_BOOT_AS_PET, "false"),
+                    description: "开启桌宠：开机自启动时以桌宠模式进入（仅 Windows 可用）"
+                        .to_string(),
+                    setting_type: "bool".to_string(),
+                }],
             },
         );
 

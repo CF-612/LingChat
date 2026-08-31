@@ -6,9 +6,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
 use crate::plugins::ResourceKind;
-use crate::utils::path::{
-    move_directory_files_to, validate_directory_name, validate_path_in_base,
-};
+use crate::utils::path::{move_directory_files_to, validate_directory_name, validate_path_in_base};
 use crate::utils::system::open_folder;
 
 use super::{default_source, mtime_secs, music_dir};
@@ -48,7 +46,11 @@ pub struct UploadMusicResult {
 // ========== 递归扫描音乐目录（含子文件夹，即子分类） ==========
 
 /// 递归收集音乐文件，并记录每个文件所属的子文件夹名（category）。
-fn collect_music_recursive(base: &Path, category: &str, out: &mut Vec<(std::path::PathBuf, String)>) {
+fn collect_music_recursive(
+    base: &Path,
+    category: &str,
+    out: &mut Vec<(std::path::PathBuf, String)>,
+) {
     if !base.exists() {
         return;
     }
@@ -114,7 +116,14 @@ pub async fn get_music_list(app: AppHandle) -> Result<Vec<MusicItemInfo>, String
 
         let url = path.to_string_lossy().into_owned();
 
-        items.push(MusicItemInfo { name, url, time, category, source: "game".to_string(), plugin_id: None });
+        items.push(MusicItemInfo {
+            name,
+            url,
+            time,
+            category,
+            source: "game".to_string(),
+            plugin_id: None,
+        });
     }
     // 合并插件背景音乐
     let plugin_entries = app
@@ -216,7 +225,7 @@ pub fn delete_music_category(name: String, mode: String) -> Result<usize, String
             let count = files.len();
             fs::remove_dir_all(&dir).map_err(|e| format!("删除分类「{}」失败: {}", name, e))?;
             Ok(count)
-        }
+        },
         _ => Err(format!("无效的分类删除模式: {mode}")),
     }
 }
@@ -327,7 +336,7 @@ pub async fn upload_music(
                     validate_path_in_base(&sub, &music_dir)?;
                     sub
                 }
-            }
+            },
             _ => {
                 if !music_dir.exists() {
                     tokio::fs::create_dir_all(&music_dir)
@@ -335,7 +344,7 @@ pub async fn upload_music(
                         .map_err(|e| format!("创建音乐目录失败: {}", e))?;
                 }
                 music_dir.clone()
-            }
+            },
         };
 
         // 5. 冲突时按 _2/_3/... 后缀

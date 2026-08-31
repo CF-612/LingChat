@@ -4,16 +4,17 @@
     :style="appStyleVars"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
-    class="relative w-(--app-width) h-(--app-height) flex flex-col justify-start items-center overflow-hidden transition-none select-none bg-transparent"
+    class="relative flex h-(--app-height) w-(--app-width) flex-col items-center justify-start
+      overflow-hidden bg-transparent transition-none select-none"
   >
     <!-- DialogueBox 区域 -->
     <div
-      class="w-full shrink-0 flex flex-col justify-end transition-none bg-transparent"
-      :class="{ 'opacity-0 pointer-events-none': !uiStore.petReady }"
+      class="flex w-full shrink-0 flex-col justify-end bg-transparent transition-none"
+      :class="{ 'pointer-events-none opacity-0': !uiStore.petReady }"
       :style="{ height: 'var(--dialog-h)' }"
     >
       <PetNotification />
-      <div class="flex items-end justify-center mt-1">
+      <div class="mt-1 flex items-end justify-center">
         <DialogueBox
           ref="gameDialogRef"
           @player-continued="manualTriggerContinue"
@@ -24,62 +25,68 @@
 
     <!-- Avatar 区域 -->
     <DragArea :isDragging="isDragging">
-    <div
-      ref="avatarContainer"
-      class="shrink-0 flex items-center justify-center transition-all duration-100 bg-transparent"
-      :style="{ width: 'var(--avatar-size)', height: 'var(--avatar-size)' }"
-    >
-      <!-- 就绪前在圆形内显示「爪印 + 转圈」加载图标，隐藏角色；等待期间仍可按住拖动 -->
       <div
-        v-if="!uiStore.petReady"
-        class="relative flex flex-col items-center justify-center gap-2 w-full h-full select-none"
-        style="cursor: grab"
-        @mousedown="startDraggingPet"
+        ref="avatarContainer"
+        class="flex shrink-0 items-center justify-center bg-transparent transition-all duration-100"
+        :style="{ width: 'var(--avatar-size)', height: 'var(--avatar-size)' }"
       >
-        <!-- 半透明圆盘底：确保透明桌宠窗口下也清晰可见，最外圈加半透明灰描边 -->
-        <div class="absolute w-[70%] h-[70%] rounded-full bg-cyan-950/45 border border-white/15 backdrop-blur-sm"></div>
-        <div class="relative w-20 h-20 flex items-center justify-center">
-          <!-- 底环 -->
-          <div class="absolute inset-0 rounded-full border-4 border-cyan-500/25"></div>
-          <!-- 旋转缺口环 -->
-          <div class="absolute inset-0 rounded-full border-4 border-transparent border-t-cyan-400 border-r-cyan-400/40 animate-spin"></div>
-          <!-- 爪印 -->
-          <svg
-            class="w-10 h-10 text-cyan-400 fill-current"
-            style="filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.55))"
-            viewBox="0 0 100 100"
-          >
-            <ellipse cx="23" cy="46" rx="7" ry="11" />
-            <ellipse cx="40" cy="28" rx="8.5" ry="13" />
-            <ellipse cx="60" cy="28" rx="8.5" ry="13" />
-            <ellipse cx="77" cy="46" rx="7" ry="11" />
-            <path
-              d="M 28,70 C 24,56 36,50 50,50 C 64,50 76,56 72,70 C 68,81 58,79 50,79 C 42,79 32,81 28,70 Z"
-            />
-          </svg>
+        <!-- 就绪前在圆形内显示「爪印 + 转圈」加载图标，隐藏角色；等待期间仍可按住拖动 -->
+        <div
+          v-if="!uiStore.petReady"
+          class="relative flex h-full w-full flex-col items-center justify-center gap-2 select-none"
+          style="cursor: grab"
+          @mousedown="startDraggingPet"
+        >
+          <!-- 半透明圆盘底：确保透明桌宠窗口下也清晰可见，最外圈加半透明灰描边 -->
+          <div
+            class="absolute h-[70%] w-[70%] rounded-full border border-white/15 bg-cyan-950/45
+              backdrop-blur-sm"
+          ></div>
+          <div class="relative flex h-20 w-20 items-center justify-center">
+            <!-- 底环 -->
+            <div class="absolute inset-0 rounded-full border-4 border-cyan-500/25"></div>
+            <!-- 旋转缺口环 -->
+            <div
+              class="absolute inset-0 animate-spin rounded-full border-4 border-transparent
+                border-t-cyan-400 border-r-cyan-400/40"
+            ></div>
+            <!-- 爪印 -->
+            <svg
+              class="h-10 w-10 fill-current text-cyan-400"
+              style="filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.55))"
+              viewBox="0 0 100 100"
+            >
+              <ellipse cx="23" cy="46" rx="7" ry="11" />
+              <ellipse cx="40" cy="28" rx="8.5" ry="13" />
+              <ellipse cx="60" cy="28" rx="8.5" ry="13" />
+              <ellipse cx="77" cy="46" rx="7" ry="11" />
+              <path
+                d="M 28,70 C 24,56 36,50 50,50 C 64,50 76,56 72,70 C 68,81 58,79 50,79 C 42,79 32,81 28,70 Z"
+              />
+            </svg>
+          </div>
+          <p class="relative text-[10px] text-cyan-200/90">{{ t("views.petMode.loading") }}</p>
         </div>
-        <p class="relative text-[10px] text-cyan-200/90">{{ t('views.petMode.loading') }}</p>
+        <GameRolesStage
+          v-else
+          @avatar-click="handleAvatarClick"
+          @open-settings="handleOpenSettings"
+          @switch-auto-mode="handleSwitchAutoMode"
+          @exit-pet-mode="handleExitPetMode"
+          @audio-ended="handleAudioFinished"
+          @audio-started="handleAudioStarted"
+        />
       </div>
-      <GameRolesStage
-        v-else
-        @avatar-click="handleAvatarClick"
-        @open-settings="handleOpenSettings"
-        @switch-auto-mode="handleSwitchAutoMode"
-        @exit-pet-mode="handleExitPetMode"
-        @audio-ended="handleAudioFinished"
-        @audio-started="handleAudioStarted"
-      />
-    </div>
     </DragArea>
 
     <!-- ChatInput 区域 -->
     <div
       ref="chatContainer"
-      class="w-full shrink-0 flex items-start justify-center transition-none bg-transparent"
+      class="flex w-full shrink-0 items-start justify-center bg-transparent transition-none"
       :style="{ height: 'var(--chat-h)' }"
     >
       <ChatInput
-        ref=ChatInputRef
+        ref="ChatInputRef"
         :visible="showChatInput && uiStore.petReady"
         @message-sent="handleMessageSent"
       />
@@ -88,349 +95,349 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow } from '@tauri-apps/api/window'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
-import { useGameStore } from '@/stores/modules/game'
-import { useSettingsStore } from '@/stores/modules/settings'
-import { useUIStore } from '@/stores/modules/ui/ui'
-import { eventQueue } from '@/core/events/event-queue'
-import { useFileDrop } from '../pet/useFileDrop'
+  import { eventQueue } from "@/core/events/event-queue";
+  import { useGameStore } from "@/stores/modules/game";
+  import { useSettingsStore } from "@/stores/modules/settings";
+  import { useUIStore } from "@/stores/modules/ui/ui";
+  import { invoke } from "@tauri-apps/api/core";
+  import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
+  import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+  import { useI18n } from "vue-i18n";
+  import { useRouter } from "vue-router";
+  import { useFileDrop } from "../pet/useFileDrop";
 
-import PetNotification from '../pet/PetNotification.vue'
-import ChatInput from '../pet/ChatInput.vue'
-import DialogueBox from '../pet/DialogueBox.vue'
-import GameRolesStage from '../pet/GameRolesStage.vue'
-import DragArea from '../pet/DragArea.vue'
-import { BASE_AVATAR_SIZE, CHAT_BASE_H, DIALOG_MAX_BASE } from '../pet/constants'
+  import ChatInput from "../pet/ChatInput.vue";
+  import DialogueBox from "../pet/DialogueBox.vue";
+  import DragArea from "../pet/DragArea.vue";
+  import GameRolesStage from "../pet/GameRolesStage.vue";
+  import PetNotification from "../pet/PetNotification.vue";
+  import { BASE_AVATAR_SIZE, CHAT_BASE_H, DIALOG_MAX_BASE } from "../pet/constants";
 
-const { t } = useI18n()
-const router = useRouter()
-const gameStore = useGameStore()
-const settingsStore = useSettingsStore()
-const uiStore = useUIStore()
+  const { t } = useI18n();
+  const router = useRouter();
+  const gameStore = useGameStore();
+  const settingsStore = useSettingsStore();
+  const uiStore = useUIStore();
 
-const showChatInput = ref(false)
-const { isDragging , hasFile } = useFileDrop()
+  const showChatInput = ref(false);
+  const { isDragging, hasFile } = useFileDrop();
 
-const avatarContainer = ref<HTMLElement | null>(null)
-const chatContainer = ref<HTMLElement | null>(null)
-const gameDialogRef = ref<InstanceType<typeof DialogueBox> | null>(null)
-const ChatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+  const avatarContainer = ref<HTMLElement | null>(null);
+  const chatContainer = ref<HTMLElement | null>(null);
+  const gameDialogRef = ref<InstanceType<typeof DialogueBox> | null>(null);
+  const ChatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
-const appStyleVars = computed(() => {
-  const scale = settingsStore.pet?.scale || 1.0
-  const layout = calcWindowLayout(scale)
-  return {
-    '--pet-ui-scale': scale.toString(),
-    '--app-width': `${layout.width}px`,
-    '--app-height': `${layout.height}px`,
-    '--avatar-size': `${Math.round(BASE_AVATAR_SIZE * scale)}px`,
-    '--chat-h': `${Math.round(CHAT_BASE_H * scale)}px`,
-    '--dialog-h': `${Math.round(DIALOG_MAX_BASE * scale)}px`,
-  }
-})
+  const appStyleVars = computed(() => {
+    const scale = settingsStore.pet?.scale || 1.0;
+    const layout = calcWindowLayout(scale);
+    return {
+      "--pet-ui-scale": scale.toString(),
+      "--app-width": `${layout.width}px`,
+      "--app-height": `${layout.height}px`,
+      "--avatar-size": `${Math.round(BASE_AVATAR_SIZE * scale)}px`,
+      "--chat-h": `${Math.round(CHAT_BASE_H * scale)}px`,
+      "--dialog-h": `${Math.round(DIALOG_MAX_BASE * scale)}px`,
+    };
+  });
 
-const calcWindowLayout = (scale: number): { width: number; height: number } => {
-  const S = Math.round(BASE_AVATAR_SIZE * scale)
-  const chatH = Math.round(CHAT_BASE_H * scale)
-  const dialogH = Math.round(DIALOG_MAX_BASE * scale)
-  return { width: S, height: S + dialogH + chatH }
-}
+  const calcWindowLayout = (scale: number): { width: number; height: number } => {
+    const S = Math.round(BASE_AVATAR_SIZE * scale);
+    const chatH = Math.round(CHAT_BASE_H * scale);
+    const dialogH = Math.round(DIALOG_MAX_BASE * scale);
+    return { width: S, height: S + dialogH + chatH };
+  };
 
-const applyWindowLayout = async () => {
-  try {
-    const scale = settingsStore.pet?.scale || 1.0
-    await invoke('set_pet_mode', { enable: true, scale })
-  } catch (error) {
-    console.error('调整窗口布局失败:', error)
-  }
-}
-
-let hitTestInterval: number | undefined
-let scaleUnlisten: (() => void) | null = null
-let effectUnlisten: (() => void) | null = null
-let volumeUnlisten: (() => void) | null = null
-let dialogHistoryUnlisten: (() => void) | null = null
-
-onMounted(async () => {
-  const appWindow = getCurrentWindow()
-
-  // 非「开机自启/启动流程」进入的桌宠（如从主界面切过来）直接可用；
-  // 开机自启进入时 petBooting=true，由 App.vue 的启动流程在就绪后设置 petReady=true。
-  if (!uiStore.petBooting) {
-    uiStore.petReady = true
-  }
-
-  scaleUnlisten = await appWindow.listen<{ scale: number }>('pet-scale-changed', (event) => {
-    const scale = Number(event.payload?.scale)
-    if (!Number.isNaN(scale)) {
-      settingsStore.pet.scale = scale
-      void applyWindowLayout()
+  const applyWindowLayout = async () => {
+    try {
+      const scale = settingsStore.pet?.scale || 1.0;
+      await invoke("set_pet_mode", { enable: true, scale });
+    } catch (error) {
+      console.error("调整窗口布局失败:", error);
     }
-  })
+  };
 
-  effectUnlisten = await appWindow.listen<{ effect: string }>(
-    'background-effect-changed',
-    (event) => {
-      const effect = event.payload?.effect
-      if (effect) {
-        uiStore.setBackgroundEffect(effect)
+  let hitTestInterval: number | undefined;
+  let scaleUnlisten: (() => void) | null = null;
+  let effectUnlisten: (() => void) | null = null;
+  let volumeUnlisten: (() => void) | null = null;
+  let dialogHistoryUnlisten: (() => void) | null = null;
+
+  onMounted(async () => {
+    const appWindow = getCurrentWindow();
+
+    // 非「开机自启/启动流程」进入的桌宠（如从主界面切过来）直接可用；
+    // 开机自启进入时 petBooting=true，由 App.vue 的启动流程在就绪后设置 petReady=true。
+    if (!uiStore.petBooting) {
+      uiStore.petReady = true;
+    }
+
+    scaleUnlisten = await appWindow.listen<{ scale: number }>("pet-scale-changed", (event) => {
+      const scale = Number(event.payload?.scale);
+      if (!Number.isNaN(scale)) {
+        settingsStore.pet.scale = scale;
+        void applyWindowLayout();
       }
-    },
-  )
+    });
 
-  volumeUnlisten = await appWindow.listen<{ volume: number }>('pet-volume-changed', (event) => {
-    const volume = Number(event.payload?.volume)
-    if (!Number.isNaN(volume)) {
-      settingsStore.updateAudio({ characterVolume: volume })
+    effectUnlisten = await appWindow.listen<{ effect: string }>(
+      "background-effect-changed",
+      (event) => {
+        const effect = event.payload?.effect;
+        if (effect) {
+          uiStore.setBackgroundEffect(effect);
+        }
+      }
+    );
+
+    volumeUnlisten = await appWindow.listen<{ volume: number }>("pet-volume-changed", (event) => {
+      const volume = Number(event.payload?.volume);
+      if (!Number.isNaN(volume)) {
+        settingsStore.updateAudio({ characterVolume: volume });
+      }
+    });
+
+    // 响应设置窗口的初始历史数据请求
+    dialogHistoryUnlisten = await appWindow.listen("request-dialog-history", () => {
+      appWindow.emit("dialog-history-changed", {
+        dialogHistory: JSON.parse(JSON.stringify(gameStore.dialogHistory)),
+      });
+    });
+
+    // 设置透明背景的 body 属性样式（额外防护）
+    document.body.style.backgroundColor = "transparent";
+    document.documentElement.style.backgroundColor = "transparent";
+
+    // 1. 初始化窗口为桌宠尺寸
+    await applyWindowLayout();
+
+    // 2. 启动 100ms 一次的 solid bounds 测试
+    hitTestInterval = window.setInterval(() => {
+      const rects = [];
+
+      // 如果对话气泡正在显示，则加入 solid region（用气泡元素精确 rect，避免包住整个对话框）
+      if (
+        gameDialogRef.value?.bubbleRef &&
+        gameStore.currentStatus === "responding" &&
+        gameStore.currentLine.trim() !== ""
+      ) {
+        const r = gameDialogRef.value.bubbleRef.getBoundingClientRect();
+        if (r.height > 0) {
+          rects.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+        }
+      }
+
+      // 头像圆环常驻 solid region 触发拖拽和交互
+      if (avatarContainer.value) {
+        const r = avatarContainer.value.getBoundingClientRect();
+        rects.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+      }
+
+      // 输入框显示时，加入 solid region
+      if (chatContainer.value && showChatInput.value) {
+        const r = chatContainer.value.getBoundingClientRect();
+        // 输入框稍微拓宽，保证极小尺寸下的鼠标判定连贯性
+        rects.push({
+          x: r.x - 20,
+          y: r.y - 20,
+          width: r.width + 40,
+          height: r.height + 40,
+        });
+      }
+
+      invoke("update_solid_regions", { rects }).catch(console.error);
+    }, 100);
+  });
+
+  watch(
+    () => settingsStore.pet?.scale,
+    () => {
+      void applyWindowLayout();
     }
-  })
+  );
 
-  // 响应设置窗口的初始历史数据请求
-  dialogHistoryUnlisten = await appWindow.listen('request-dialog-history', () => {
-    appWindow.emit('dialog-history-changed', {
-      dialogHistory: JSON.parse(JSON.stringify(gameStore.dialogHistory)),
-    })
-  })
+  // 监听 dialogHistory 变化，推送给设置窗口
+  watch(
+    () => gameStore.dialogHistory.length,
+    () => {
+      const appWindow = getCurrentWindow();
+      appWindow.emit("dialog-history-changed", {
+        dialogHistory: JSON.parse(JSON.stringify(gameStore.dialogHistory)),
+      });
+    }
+  );
 
-  // 设置透明背景的 body 属性样式（额外防护）
-  document.body.style.backgroundColor = 'transparent'
-  document.documentElement.style.backgroundColor = 'transparent'
+  onUnmounted(() => {
+    // 恢复默认背景色
+    document.body.style.backgroundColor = "";
+    document.documentElement.style.backgroundColor = "";
 
-  // 1. 初始化窗口为桌宠尺寸
-  await applyWindowLayout()
+    if (scaleUnlisten) scaleUnlisten();
+    if (effectUnlisten) effectUnlisten();
+    if (volumeUnlisten) volumeUnlisten();
+    if (dialogHistoryUnlisten) dialogHistoryUnlisten();
 
-  // 2. 启动 100ms 一次的 solid bounds 测试
-  hitTestInterval = window.setInterval(() => {
-    const rects = []
+    if (hitTestInterval !== undefined) {
+      window.clearInterval(hitTestInterval);
+    }
+  });
 
-    // 如果对话气泡正在显示，则加入 solid region（用气泡元素精确 rect，避免包住整个对话框）
-    if (
-      gameDialogRef.value?.bubbleRef &&
-      gameStore.currentStatus === 'responding' &&
-      gameStore.currentLine.trim() !== ''
-    ) {
-      const r = gameDialogRef.value.bubbleRef.getBoundingClientRect()
-      if (r.height > 0) {
-        rects.push({ x: r.x, y: r.y, width: r.width, height: r.height })
+  const handleMessageSent = (message: string) => {
+    gameStore.appendGameMessage({
+      type: "message",
+      displayName: gameStore.userName,
+      content: message,
+    });
+  };
+
+  /** 加载期间按住也能拖动桌宠（与角色头像的拖拽一致） */
+  const startDraggingPet = () => {
+    getCurrentWindow()
+      .startDragging()
+      .catch(() => {});
+  };
+
+  const handleMouseEnter = () => {
+    showChatInput.value = true;
+  };
+
+  const handleMouseLeave = () => {
+    if (ChatInputRef.value?.isTyping()) {
+      showChatInput.value = true;
+      return;
+    } else {
+      showChatInput.value = false;
+    }
+  };
+
+  const handleAvatarClick = () => {
+    manualTriggerContinue();
+    eventQueue.continue();
+    resetInteraction();
+  };
+
+  const handleOpenSettings = async () => {
+    try {
+      const existing = await WebviewWindow.getByLabel("settings");
+      if (existing) {
+        await existing.setFocus();
+        return;
+      }
+
+      const webview = new WebviewWindow("settings", {
+        url: "/second",
+        title: t("views.petMode.settingsWindowTitle"),
+        width: 1200,
+        height: 800,
+        resizable: true,
+        shadow: false,
+        decorations: false,
+        transparent: true,
+        alwaysOnTop: false,
+      });
+
+      webview.once("tauri://created", () => {
+        console.log("桌宠轻量设置窗口创建成功");
+      });
+
+      webview.once("tauri://error", (e) => {
+        console.error("创建桌宠轻量设置窗口失败:", e);
+      });
+    } catch (error) {
+      console.error("打开设置窗口时出错:", error);
+    }
+  };
+
+  // 自动打字/对话逻辑
+  let timerId: any = null;
+  const isContinueTriggered = ref(false);
+  const audioFinished = ref(true);
+
+  const resetInteraction = () => {
+    isContinueTriggered.value = false;
+    audioFinished.value = true;
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+  };
+
+  const tryAutoAdvance = () => {
+    if (!uiStore.autoMode) return;
+    if (isContinueTriggered.value) return;
+    if (gameStore.currentStatus !== "responding") return;
+
+    const typing = gameDialogRef.value?.isTyping ?? false;
+    if (typing || !audioFinished.value) return;
+
+    if (timerId) clearTimeout(timerId);
+    timerId = setTimeout(() => {
+      if (gameDialogRef.value) {
+        const needWait = gameDialogRef.value.continueDialog(false);
+        if (needWait) {
+          tryAutoAdvance();
+        }
+      }
+    }, settingsStore.autoAdvanceDelay);
+  };
+
+  const handleAudioStarted = () => {
+    audioFinished.value = false;
+  };
+
+  const handleAudioFinished = () => {
+    audioFinished.value = true;
+    tryAutoAdvance();
+  };
+
+  watch(
+    () => gameDialogRef.value?.isTyping,
+    (typing) => {
+      if (typing === false) {
+        tryAutoAdvance();
       }
     }
+  );
 
-    // 头像圆环常驻 solid region 触发拖拽和交互
-    if (avatarContainer.value) {
-      const r = avatarContainer.value.getBoundingClientRect()
-      rects.push({ x: r.x, y: r.y, width: r.width, height: r.height })
+  const manualTriggerContinue = () => {
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
     }
-
-    // 输入框显示时，加入 solid region
-    if (chatContainer.value && showChatInput.value) {
-      const r = chatContainer.value.getBoundingClientRect()
-      // 输入框稍微拓宽，保证极小尺寸下的鼠标判定连贯性
-      rects.push({
-        x: r.x - 20,
-        y: r.y - 20,
-        width: r.width + 40,
-        height: r.height + 40,
-      })
+    if (!isContinueTriggered.value) {
+      isContinueTriggered.value = true;
     }
+  };
 
-    invoke('update_solid_regions', { rects }).catch(console.error)
-  }, 100)
-})
+  const handleSwitchAutoMode = () => {
+    uiStore.autoMode = !uiStore.autoMode;
+  };
 
-watch(
-  () => settingsStore.pet?.scale,
-  () => {
-    void applyWindowLayout()
-  },
-)
-
-// 监听 dialogHistory 变化，推送给设置窗口
-watch(
-  () => gameStore.dialogHistory.length,
-  () => {
-    const appWindow = getCurrentWindow()
-    appWindow.emit('dialog-history-changed', {
-      dialogHistory: JSON.parse(JSON.stringify(gameStore.dialogHistory)),
-    })
-  },
-)
-
-onUnmounted(() => {
-  // 恢复默认背景色
-  document.body.style.backgroundColor = ''
-  document.documentElement.style.backgroundColor = ''
-
-  if (scaleUnlisten) scaleUnlisten()
-  if (effectUnlisten) effectUnlisten()
-  if (volumeUnlisten) volumeUnlisten()
-  if (dialogHistoryUnlisten) dialogHistoryUnlisten()
-
-  if (hitTestInterval !== undefined) {
-    window.clearInterval(hitTestInterval)
-  }
-})
-
-const handleMessageSent = (message: string) => {
-  gameStore.appendGameMessage({
-    type: 'message',
-    displayName: gameStore.userName,
-    content: message,
-  })
-}
-
-/** 加载期间按住也能拖动桌宠（与角色头像的拖拽一致） */
-const startDraggingPet = () => {
-  getCurrentWindow().startDragging().catch(() => {})
-}
-
-
-const handleMouseEnter = () => {
-  showChatInput.value = true
-}
-
-const handleMouseLeave = () => {
-  if (ChatInputRef.value?.isTyping()) {
-    showChatInput.value = true
-    return
-  }else{
-    showChatInput.value = false
-  }
-  
-}
-
-const handleAvatarClick = () => {
-  manualTriggerContinue()
-  eventQueue.continue()
-  resetInteraction()
-}
-
-const handleOpenSettings = async () => {
-  try {
-    const existing = await WebviewWindow.getByLabel('settings')
-    if (existing) {
-      await existing.setFocus()
-      return
-    }
-
-    const webview = new WebviewWindow('settings', {
-      url: '/second',
-      title: t('views.petMode.settingsWindowTitle'),
-      width: 1200,
-      height: 800,
-      resizable: true,
-      shadow: false,
-      decorations: false,
-      transparent: true,
-      alwaysOnTop: false,
-    })
-
-    webview.once('tauri://created', () => {
-      console.log('桌宠轻量设置窗口创建成功')
-    })
-
-    webview.once('tauri://error', (e) => {
-      console.error('创建桌宠轻量设置窗口失败:', e)
-    })
-  } catch (error) {
-    console.error('打开设置窗口时出错:', error)
-  }
-}
-
-// 自动打字/对话逻辑
-let timerId: any = null
-const isContinueTriggered = ref(false)
-const audioFinished = ref(true)
-
-const resetInteraction = () => {
-  isContinueTriggered.value = false
-  audioFinished.value = true
-  if (timerId) {
-    clearTimeout(timerId)
-    timerId = null
-  }
-}
-
-const tryAutoAdvance = () => {
-  if (!uiStore.autoMode) return
-  if (isContinueTriggered.value) return
-  if (gameStore.currentStatus !== 'responding') return
-
-  const typing = gameDialogRef.value?.isTyping ?? false
-  if (typing || !audioFinished.value) return
-
-  if (timerId) clearTimeout(timerId)
-  timerId = setTimeout(() => {
-    if (gameDialogRef.value) {
-      const needWait = gameDialogRef.value.continueDialog(false)
-      if (needWait) {
-        tryAutoAdvance()
+  const handleExitPetMode = async () => {
+    // 关闭设置窗口（如果打开的话）
+    try {
+      const settingsWindow = await WebviewWindow.getByLabel("settings");
+      if (settingsWindow) {
+        await settingsWindow.close();
       }
+    } catch {
+      // 窗口不存在，忽略
     }
-  }, 1000)
-}
 
-const handleAudioStarted = () => {
-  audioFinished.value = false
-}
-
-const handleAudioFinished = () => {
-  audioFinished.value = true
-  tryAutoAdvance()
-}
-
-watch(
-  () => gameDialogRef.value?.isTyping,
-  (typing) => {
-    if (typing === false) {
-      tryAutoAdvance()
-    }
-  },
-)
-
-const manualTriggerContinue = () => {
-  if (timerId) {
-    clearTimeout(timerId)
-    timerId = null
-  }
-  if (!isContinueTriggered.value) {
-    isContinueTriggered.value = true
-  }
-}
-
-const handleSwitchAutoMode = () => {
-  uiStore.autoMode = !uiStore.autoMode
-}
-
-const handleExitPetMode = async () => {
-  // 关闭设置窗口（如果打开的话）
-  try {
-    const settingsWindow = await WebviewWindow.getByLabel('settings')
-    if (settingsWindow) {
-      await settingsWindow.close()
-    }
-  } catch {
-    // 窗口不存在，忽略
-  }
-
-  // 退出时清除 solid region，防止残留
-  await invoke('update_solid_regions', { rects: [] })
-  // 1. 关闭桌宠窗口特性，恢复 1500x800 的正常主窗口
-  await invoke('set_pet_mode', { enable: false })
-  // 2. 路由导航回聊天主页面
-  router.push('/chat')
-}
+    // 退出时清除 solid region，防止残留
+    await invoke("update_solid_regions", { rects: [] });
+    // 1. 关闭桌宠窗口特性，恢复 1500x800 的正常主窗口
+    await invoke("set_pet_mode", { enable: false });
+    // 2. 路由导航回聊天主页面
+    router.push("/chat");
+  };
 </script>
 
 <style scoped>
-#pet-app {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
+  #pet-app {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+  }
 </style>

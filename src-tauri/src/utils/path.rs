@@ -18,15 +18,9 @@ pub fn validate_directory_name(raw: &str) -> Result<String, String> {
         Some(std::path::Component::Normal(component)) if component == name
     ) && components.next().is_none();
     if !is_single_normal_component
-        || name
-            .chars()
-            .any(|c| {
-                c.is_control()
-                    || matches!(
-                        c,
-                        '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
-                    )
-            })
+        || name.chars().any(|c| {
+            c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+        })
         || name.ends_with('.')
         || name.ends_with(' ')
     {
@@ -39,10 +33,7 @@ pub fn validate_directory_name(raw: &str) -> Result<String, String> {
             .strip_prefix("COM")
             .or_else(|| stem.strip_prefix("LPT"))
             .is_some_and(|suffix| {
-                matches!(
-                    suffix,
-                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
-                )
+                matches!(suffix, "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9")
             });
     if is_reserved_device {
         return Err("分类名不能使用系统保留名称".to_string());
@@ -106,7 +97,10 @@ pub fn move_directory_files_to(source_dir: &Path, target_dir: &Path) -> Result<u
             .ok_or_else(|| format!("无效的文件路径: {}", source.display()))?;
         let collision_key = file_name.to_string_lossy().to_lowercase();
         if !destination_names.insert(collision_key) {
-            return Err(format!("分类中存在重名文件，无法安全移动: {}", file_name.to_string_lossy()));
+            return Err(format!(
+                "分类中存在重名文件，无法安全移动: {}",
+                file_name.to_string_lossy()
+            ));
         }
         let destination = target_dir.join(file_name);
         if destination.exists() {
@@ -158,8 +152,7 @@ pub fn resolve_character_path(data_dir: &Path, resource_path: &str) -> PathBuf {
 /// 批量创建目录（幂等）。任一失败立即返回错误。
 pub fn ensure_dirs(dirs: &[&Path]) -> Result<(), String> {
     for d in dirs {
-        std::fs::create_dir_all(d)
-            .map_err(|e| format!("create_dir_all {}: {e}", d.display()))?;
+        std::fs::create_dir_all(d).map_err(|e| format!("create_dir_all {}: {e}", d.display()))?;
     }
     Ok(())
 }
@@ -203,7 +196,14 @@ mod tests {
 
     #[test]
     fn rejects_traversal_and_windows_reserved_names() {
-        for invalid in ["../outside", r"foo\bar", "a/b", "NUL", "COM1.txt", "trailing."] {
+        for invalid in [
+            "../outside",
+            r"foo\bar",
+            "a/b",
+            "NUL",
+            "COM1.txt",
+            "trailing.",
+        ] {
             assert!(validate_directory_name(invalid).is_err(), "{invalid}");
         }
     }

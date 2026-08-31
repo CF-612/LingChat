@@ -2,6 +2,7 @@ mod achievements;
 mod adventures;
 mod ai_service;
 mod api;
+mod cast;
 mod config;
 mod db;
 mod init;
@@ -16,9 +17,9 @@ use std::sync::Arc;
 
 use chrono::Local;
 use sea_orm::DatabaseConnection;
-use tauri::{Listener, Manager};
 #[cfg(desktop)]
 use tauri::Emitter;
+use tauri::{Listener, Manager};
 use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -293,7 +294,11 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         // 开机自启动时给启动命令追加 --autostart，方便区分「系统自启」与「手动启动」：
         // 只有带 --autostart 的这次启动才按 boot_as_pet 进入桌宠，手动启动走主菜单。
-        .plugin(tauri_plugin_autostart::Builder::new().args(["--autostart"]).build());
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .args(["--autostart"])
+                .build(),
+        );
 
     builder
         .setup(move |app| {
@@ -308,6 +313,7 @@ pub fn run() {
             app.manage(api::pet::HitTestState::default());
             app.manage(resource_sync::ResourceSyncState::default());
             app.manage(lan_sync::LanSyncState::default());
+            app.manage(cast::CastManager::default());
             app.manage(utils::cpu_perf::CpuDetectionCache::new());
             app.manage(utils::gpu_perf::GpuDetectionCache::new());
             app.manage(api::role_archive::RoleArchiveState::default());
@@ -536,6 +542,26 @@ pub fn run() {
                     tracing::warn!("[ASR] init_asr 失败，ASR 功能不可用: {e:#}");
                 }
             }
+            // 投屏自动启动：设置 cast.enabled=true 时，启动即打开投屏窗口并开启串流服务。
+            // 延迟到主界面就绪后再做，避免投屏窗口先于主界面拿到场景快照。
+            {
+                let store = config::settings_store(app.handle()).ok();
+                let cast_enabled = store
+                    .as_ref()
+                    .and_then(|s| s.get(config::keys::CAST_ENABLED))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if cast_enabled {
+                    let app_handle = app.handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+                        let cast = app_handle.state::<cast::CastManager>();
+                        if let Err(e) = cast::start_cast_server(&app_handle, &cast).await {
+                            tracing::warn!("[Cast] 启动时自动开启投屏失败: {e}");
+                        }
+                    });
+                }
+            }
 
             // 插件携带资源收敛：把启用插件的人物/剧本/背景图同步进 DB / 剧本引擎 / 场景表。
             rt.block_on(api::plugins::refresh_plugin_content(app.handle()));
@@ -616,7 +642,10 @@ pub fn run() {
                                 // 视口坐标）发给前端驱动视线，与 DOM clientX/Y 同坐标系。
                                 let _ = window.emit(
                                     "pet:cursor",
-                                    api::pet::CursorPosition { x: logical_x, y: logical_y },
+                                    api::pet::CursorPosition {
+                                        x: logical_x,
+                                        y: logical_y,
+                                    },
                                 );
 
                                 let mut is_over_solid = false;
@@ -666,6 +695,8 @@ pub fn run() {
             api::plugins::plugin_resource_hide,
             api::plugins::plugin_resource_restore,
             api::plugins::plugin_resource_keep,
+            api::plugins::import_plugin_from_path,
+            api::plugins::cancel_plugin_import,
             api::settings::get_settings_tree,
             api::settings::save_settings,
             api::settings::get_setting_by_key,
@@ -758,8 +789,6 @@ pub fn run() {
             api::save::update_save_title,
             api::save::save_screenshot,
             api::save::capture_main_window_screenshot,
-            api::settings_snapshot::capture_settings_snapshot,
-            api::settings_snapshot::cleanup_settings_snapshot,
             api::script::list_scripts,
             api::script::list_standalone_scripts,
             api::script::start_script,
@@ -842,10 +871,21 @@ pub fn run() {
             lan_sync::lan_sync_plan_pull,
             lan_sync::lan_sync_execute_pull,
             lan_sync::lan_sync_restart,
+            // ── 投屏（Screen Cast）──
+            cast::cast_open_window,
+            cast::cast_close_window,
+            cast::cast_start,
+            cast::cast_stop,
+            cast::cast_get_status,
+            cast::cast_get_snapshot,
+            cast::cast_emit_mirror,
+            cast::cast_get_mirror,
+            cast::cast_play_voice,
             utils::cpu_perf::get_cpu_info,
             utils::cpu_perf::redetect_cpu,
             utils::gpu_perf::get_gpu_info,
             utils::gpu_perf::redetect_gpu,
+            utils::gpu_perf::grade_active_gpu,
             api::role_archive::import_role,
             api::role_archive::import_role_from_path,
             api::role_archive::cancel_role_import,
@@ -863,6 +903,13 @@ pub fn run() {
             ai_service::tts::local::tts_local_import_style_vectors,
             ai_service::tts::local::tts_local_synthesize_preview,
             ai_service::tts::local::tts_local_get_enabled,
+            ai_service::tts::cloud::commands::cosyvoice_get_config,
+            ai_service::tts::cloud::commands::cosyvoice_save_api_key,
+            ai_service::tts::cloud::commands::cosyvoice_create_voice,
+            ai_service::tts::cloud::commands::cosyvoice_voice_status,
+            ai_service::tts::cloud::commands::cosyvoice_list_voices,
+            ai_service::tts::cloud::commands::cosyvoice_delete_voice,
+            ai_service::tts::cloud::commands::cosyvoice_synthesize_preview,
             ai_service::tts::local::tts_local_set_enabled,
             // 推理设备选择：获取当前设备 / 枚举可用设备 / 切换设备
             ai_service::tts::local::tts_local_get_device,

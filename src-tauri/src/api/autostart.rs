@@ -16,8 +16,8 @@ use tauri::{AppHandle, Manager};
 #[cfg(desktop)]
 use tauri_plugin_autostart::ManagerExt;
 
-use crate::config::{self, keys};
 use crate::AppState;
+use crate::config::{self, keys};
 
 /// 自启动当前状态（供设置面板展示与前端启动决策）。
 #[derive(Debug, Clone, Serialize)]
@@ -134,7 +134,8 @@ pub fn set_system_autostart(app: &AppHandle, enabled: bool) -> Result<(), String
     if enabled {
         mgr.enable().map_err(|e| format!("开启开机自启动失败: {e}"))
     } else {
-        mgr.disable().map_err(|e| format!("关闭开机自启动失败: {e}"))
+        mgr.disable()
+            .map_err(|e| format!("关闭开机自启动失败: {e}"))
     }
 }
 
@@ -178,10 +179,15 @@ pub fn autostart_set_enabled(app: AppHandle, enabled: bool) -> Result<(), String
 /// - 其余（simple-vits / SBV2 / GPT-SoVITS / FISH / OpenTTS 等外部分离服务）→
 ///   执行启动脚本，轮询探测服务可达性，就绪后刷新 TTS。
 #[tauri::command]
-pub async fn autostart_boot_apply(app: AppHandle, role_id: Option<i32>) -> Result<AutostartBootResult, String> {
+pub async fn autostart_boot_apply(
+    app: AppHandle,
+    role_id: Option<i32>,
+) -> Result<AutostartBootResult, String> {
     let config = read_config(&app);
 
-    let tts_type = resolve_role_tts_type(&app, role_id).await.unwrap_or_default();
+    let tts_type = resolve_role_tts_type(&app, role_id)
+        .await
+        .unwrap_or_default();
     let embedded = tts_type.is_empty() || tts_type == "localsbv2api";
 
     // 内置引擎无需拉起外部服务，直接视为就绪
@@ -265,9 +271,12 @@ async fn resolve_role_tts_type(app: &AppHandle, role_id: Option<i32>) -> Option<
                 let svc = state.ai_service.lock().await;
                 svc.game_status.clone()
             };
-            let current = { let gs = gs.lock().await; gs.current_role_id };
+            let current = {
+                let gs = gs.lock().await;
+                gs.current_role_id
+            };
             current?
-        }
+        },
     };
     let state = app.state::<AppState>();
     let db = &state.db;

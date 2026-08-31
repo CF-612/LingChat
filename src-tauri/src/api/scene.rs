@@ -5,10 +5,10 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
+use crate::AppState;
 use crate::ai_service::game_system::scene_store::{LightingParams, Scene, SceneStore};
 use crate::api::data_dir;
 use crate::utils::path::{validate_directory_name, validate_path_in_base};
-use crate::AppState;
 
 // ========== Response types ==========
 
@@ -128,7 +128,10 @@ fn model_to_info_with_background_map(
         lighting: scene.lighting.clone(),
         created_at: scene.created_at.clone(),
         updated_at: scene.updated_at.clone(),
-        source: scene.plugin_id.clone().unwrap_or_else(|| "game".to_string()),
+        source: scene
+            .plugin_id
+            .clone()
+            .unwrap_or_else(|| "game".to_string()),
         plugin_id: scene.plugin_id.clone(),
     }
 }
@@ -202,10 +205,7 @@ pub async fn list_scenes(_app: AppHandle) -> Result<Vec<SceneInfo>, String> {
     let bg_dir = super::backgrounds_dir();
     let mut background_files: Vec<std::path::PathBuf> = Vec::new();
     if bg_dir.exists() {
-        super::background::collect_background_files_recursive_pub(
-            &bg_dir,
-            &mut background_files,
-        );
+        super::background::collect_background_files_recursive_pub(&bg_dir, &mut background_files);
     }
     let mut backgrounds_by_name: HashMap<String, String> = HashMap::new();
     for path in &background_files {

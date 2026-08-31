@@ -5,9 +5,7 @@ use std::path::Path;
 use tauri::{AppHandle, Manager};
 
 use crate::plugins::ResourceKind;
-use crate::utils::path::{
-    move_directory_files_to, validate_directory_name, validate_path_in_base,
-};
+use crate::utils::path::{move_directory_files_to, validate_directory_name, validate_path_in_base};
 use crate::utils::system::open_folder;
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +31,10 @@ pub struct BackgroundItemInfo {
 // ========== 递归扫描背景目录（含子文件夹，即子分类） ==========
 
 /// 递归收集背景文件（只返回路径列表，供 scene.rs 自动注册场景用）。
-pub(crate) fn collect_background_files_recursive_pub(base: &Path, out: &mut Vec<std::path::PathBuf>) {
+pub(crate) fn collect_background_files_recursive_pub(
+    base: &Path,
+    out: &mut Vec<std::path::PathBuf>,
+) {
     if !base.exists() {
         return;
     }
@@ -59,7 +60,10 @@ pub(crate) fn collect_background_files_recursive_pub(base: &Path, out: &mut Vec<
 
 /// 在背景目录（含所有子文件夹）中按文件名（忽略大小写）递归查找，返回完整路径。
 /// 供 scene 解析背景时使用：即使背景放在子文件夹（分类）里，也能正确显示。
-pub(crate) fn find_background_file_recursive(data_dir: &std::path::Path, filename: &str) -> Option<String> {
+pub(crate) fn find_background_file_recursive(
+    data_dir: &std::path::Path,
+    filename: &str,
+) -> Option<String> {
     let bg_base = data_dir.join("game_data").join("backgrounds");
     let target = filename.to_lowercase();
     let mut files = Vec::new();
@@ -76,7 +80,11 @@ pub(crate) fn find_background_file_recursive(data_dir: &std::path::Path, filenam
 
 /// 递归收集背景文件，并记录每个文件所属的子文件夹名（category）。
 /// 根目录下的文件 category 为“根目录”。
-fn collect_backgrounds_recursive(base: &Path, category: &str, out: &mut Vec<(std::path::PathBuf, String)>) {
+fn collect_backgrounds_recursive(
+    base: &Path,
+    category: &str,
+    out: &mut Vec<(std::path::PathBuf, String)>,
+) {
     if !base.exists() {
         return;
     }
@@ -144,7 +152,14 @@ pub async fn get_background_list(app: AppHandle) -> Result<Vec<BackgroundItemInf
 
         let url = path.to_string_lossy().into_owned();
 
-        items.push(BackgroundItemInfo { title, url, time, category, source: "game".to_string(), plugin_id: None });
+        items.push(BackgroundItemInfo {
+            title,
+            url,
+            time,
+            category,
+            source: "game".to_string(),
+            plugin_id: None,
+        });
     }
     // 合并插件背景图（已按游戏优先 + 插件间先注册者赢 + 隐藏过滤）
     let plugin_entries = app
@@ -310,7 +325,7 @@ pub async fn upload_background_image(
                 validate_path_in_base(&sub, &bg_dir)?;
                 sub
             }
-        }
+        },
         _ => bg_dir.clone(),
     };
 
