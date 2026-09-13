@@ -9,12 +9,17 @@
     <div
       class="chat-input-container flex items-center rounded-[calc(20px*var(--pet-ui-scale,1))] border border-white/10 bg-neutral-950/50 p-[calc(4px*var(--pet-ui-scale,1))] saturate-200 backdrop-blur-xl"
     >
+      <!-- 字号只能走内联 style：base.css 里 `input, textarea { font-size: max(16px, 1em) }`
+           是无 layer 规则，层叠上压过所有 Tailwind 工具类，会把桌面端字号钉死在 16px，
+           于是 input 的固有宽度/高度不随 --pet-ui-scale 变化（内联 style 才能盖过它）。
+           基准 16px 取该规则当前的实际生效值，保证 scale=1 时外观不变。 -->
       <input
         v-model="messageText"
         type="text"
         :placeholder="placeholderText"
         :readonly="!isInputEnabled"
-        class="flex-1 border-none bg-transparent p-[calc(5px*var(--pet-ui-scale,1))] text-[calc(13px*var(--pet-ui-scale,1))] text-white placeholder-white/40 outline-none [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]"
+        class="flex-1 border-none bg-transparent p-[calc(5px*var(--pet-ui-scale,1))] text-white placeholder-white/40 outline-none [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]"
+        :style="{ fontSize: 'calc(16px * var(--pet-ui-scale, 1))' }"
         @keyup.enter="send"
         @compositionstart="isCompsing = true"
         @compositionend="isCompsing = false"

@@ -115,6 +115,7 @@ let effectUnlisten: (() => void) | null = null;
 let volumeUnlisten: (() => void) | null = null;
 let live2dFpsUnlisten: (() => void) | null = null;
 let dialogHistoryUnlisten: (() => void) | null = null;
+let cursorUnlisten: (() => void) | null = null;
 
 onMounted(async () => {
   const appWindow = getCurrentWindow();
@@ -157,6 +158,16 @@ onMounted(async () => {
     appWindow.emit("dialog-history-changed", {
       dialogHistory: JSON.parse(JSON.stringify(gameStore.dialogHistory)),
     });
+  });
+
+  // 输入框显隐兜底：光标是否仍在桌宠窗口内。不能只靠 #pet-app 的
+  // mouseenter/mouseleave —— 光标离开 solid 区域后窗口会自动开启点击穿透
+  // （见 src-tauri/src/api/pet.rs 的 spawn_hit_test_poll），webview 从此收不到
+  // 鼠标事件，mouseleave 可能永远不来、输入框再也隐藏不掉。pet:cursor 是 Rust 侧
+  // 全局轮询广播（每 50ms，窗口内逻辑坐标，与 DOM 同坐标系），可兜住这种情况。
+  cursorUnlisten = await appWindow.listen<{ x: number; y: number }>("pet:cursor", (event) => {
+    const { x, y } = event.payload;
+    setShowChatInput(x >= 0 && y >= 0 && x <= window.innerWidth && y <= window.innerHeight);
   });
 
   // 设置透明背景的 body 属性样式（额外防护）
@@ -240,23 +251,24 @@ onUnmounted(() => {
   if (volumeUnlisten) volumeUnlisten();
   if (live2dFpsUnlisten) live2dFpsUnlisten();
   if (dialogHistoryUnlisten) dialogHistoryUnlisten();
+  if (cursorUnlisten) cursorUnlisten();
 
   if (hitTestInterval !== undefined) {
     window.clearInterval(hitTestInterval);
   }
 });
 
+// 光标在桌宠窗口内就显示输入框，离开则隐藏；草稿非空（正在打字）时保持显示
+const setShowChatInput = (insideWindow: boolean) => {
+  showChatInput.value = insideWindow || (ChatInputRef.value?.isTyping() ?? false);
+};
+
 const handleMouseEnter = () => {
-  showChatInput.value = true;
+  setShowChatInput(true);
 };
 
 const handleMouseLeave = () => {
-  if (ChatInputRef.value?.isTyping()) {
-    showChatInput.value = true;
-    return;
-  } else {
-    showChatInput.value = false;
-  }
+  setShowChatInput(false);
 };
 
 const handleAvatarClick = () => {
