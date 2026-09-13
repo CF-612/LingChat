@@ -47,7 +47,6 @@
 </template>
 
 <script setup lang="ts">
-import { eventQueue } from "@/core/events/event-queue";
 import { useGameStore } from "@/stores/modules/game";
 import { useSettingsStore } from "@/stores/modules/settings";
 import { useUIStore } from "@/stores/modules/ui/ui";
@@ -261,9 +260,11 @@ const handleMouseLeave = () => {
 };
 
 const handleAvatarClick = () => {
-  // 取消待触发的自动推进定时器（resetInteraction 的死锁存器已随之移除）
-  manualTriggerContinue();
-  eventQueue.continue();
+  // 走 continueDialog 而非直接 eventQueue.continue()：后者绕过了「打字中先补全文本
+  // 再推进」的守卫，也跳过 player-continued/dialog-proceed 派发——打字中点头像会
+  // 把正在打的字丢掉。continueDialog 在真的推进时会派发 player-continued，
+  // 由 @player-continued 绑定的 manualTriggerContinue 取消待触发的自动推进定时器。
+  gameDialogRef.value?.continueDialog(true);
 };
 
 const handleOpenSettings = async () => {
