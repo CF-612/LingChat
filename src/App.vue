@@ -1,5 +1,12 @@
 <template>
   <router-view />
+  <!-- macOS 无边框窗口：顶部拖拽区（配合 Overlay 红绿灯）。仅在 macOS 主窗口挂载，
+       其余窗口 / Windows / Linux / 移动端不渲染，避免影响既有拖动与点击。 -->
+  <div
+    v-if="isMacOverlayWindow"
+    class="mac-drag-region"
+    data-tauri-drag-region
+  ></div>
   <!-- 将光标特效 teleport 到 body，避免 #app 上的整体缩放（transform: scale）导致坐标偏移 -->
   <Teleport to="body">
     <CursorEffects />
@@ -15,49 +22,111 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, onUnmounted, watch } from "vue";
-  import { useRoute } from "vue-router";
-  import { getCurrentWindow } from "@tauri-apps/api/window";
-  import { listen } from "@tauri-apps/api/event";
-  import { invoke } from "@tauri-apps/api/core";
-  import CursorEffects from "./components/effects/CursorEffects.vue";
-  import Notification from "./components/ui/Notification.vue";
-  import AchievementToast from "./components/ui/AchievementToast.vue";
-  import AdventureUnlockNotify from "./components/ui/AdventureUnlockNotify.vue";
-  import AppDialog from "./components/ui/AppDialog.vue";
-  import { initUIStore, useUIStore } from "./stores/modules/ui/ui";
-  import { useGameStore } from "./stores/modules/game";
-  import { i18n } from "./locales";
-  import { useSettingsStore } from "./stores/modules/settings";
-  import { useLlmProvidersStore } from "./stores/modules/llm-providers";
-  import { useAchievementStore } from "./stores/modules/ui/achievement";
-  import { useDialogStore } from "./stores/modules/ui/dialog";
-  import { useSedentaryReminder } from "./composables/useSedentaryReminder";
-  import { useUpdater } from "./composables/useUpdater";
-  import { useCanDeliver } from "./composables/useCanDeliver";
-  import { useZoom } from "./composables/useZoom";
-  import { useAsrInput } from "./composables/useAsrInput";
-  import { listSystemFonts, getImportedFonts, registerAllImportedFonts } from "./api/services/font";
-  import { isMobile } from "./utils/platform";
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
+import CursorEffects from './components/effects/CursorEffects.vue'
+import { isMacOS } from './utils/platform'
+import Notification from './components/ui/Notification.vue'
+import AchievementToast from './components/ui/AchievementToast.vue'
+import AdventureUnlockNotify from './components/ui/AdventureUnlockNotify.vue'
+import AppDialog from './components/ui/AppDialog.vue'
+import { initUIStore } from './stores/modules/ui/ui'
+import { i18n } from './locales'
+import { useSettingsStore } from './stores/modules/settings'
+import { useLlmProvidersStore } from './stores/modules/llm-providers'
+import { useAchievementStore } from './stores/modules/ui/achievement'
+import { useDialogStore } from './stores/modules/ui/dialog'
+import { useSedentaryReminder } from './composables/useSedentaryReminder'
+import { useUpdater } from './composables/useUpdater'
+import { useCanDeliver } from './composables/useCanDeliver'
+import { useZoom } from './composables/useZoom'
+import { useAsrInput } from './composables/useAsrInput'
+import { listSystemFonts, getImportedFonts, registerAllImportedFonts } from './api/services/font'
+import { isMobile } from './utils/platform'
 
-  // ─── 激活主动对话投放条件上报（仅在此处挂载一次） ────────────
-  useCanDeliver();
+// ─── 激活主动对话投放条件上报（仅在此处挂载一次） ────────────
+useCanDeliver()
 
-  // 激活 Ctrl+滚轮 UI 全局缩放
-  useZoom();
+// 激活 Ctrl+滚轮 UI 全局缩放
+useZoom()
 
-  // ─── 久坐提醒 ────────────────────────────────────────────────
-  useSedentaryReminder();
+// ─── 久坐提醒 ────────────────────────────────────────────────
+useSedentaryReminder()
 
-  // ─── 全局字体 ────────────────────────────────────────────────
-  // 把设置中的自定义字体名同步到 <html> 的 --font-app；
-  // 为空时 base.css 中的回退栈 --font-sans 生效。初始菜单 / 加载页因自带
-  // 显式 font-family 不会继承此变量，自动保持原有字体。
-  const settingsStore = useSettingsStore();
-  function applyFont(font?: string) {
-    // 留空 → 软件默认（base.css 的 --font-sans 原版字体栈）
-    document.documentElement.style.setProperty("--font-app", font ? `'${font}'` : "");
+// ─── 全局字体 ────────────────────────────────────────────────
+// 把设置中的自定义字体名同步到 <html> 的 --font-app；
+// 为空时 base.css 中的回退栈 --font-sans 生效。初始菜单 / 加载页因自带
+// 显式 font-family 不会继承此变量，自动保持原有字体。
+const settingsStore = useSettingsStore()
+function applyFont(font?: string) {
+  // 留空 → 软件默认（base.css 的 --font-sans 原版字体栈）
+  document.documentElement.style.setProperty('--font-app', font ? `'${font}'` : '')
+}
+watch(() => settingsStore.text.fontFamily, applyFont, { immediate: true })
+
+// 提前预取系统字体列表：在应用初始化时即调用一次 Rust 枚举并入内存缓存，
+// 避免打开设置页时才触发 IPC 造成可感知的卡顿。注：忽略结果即可，
+// SettingsText 进入时直接命中 font.ts 的缓存。
+void listSystemFonts()
+
+// 启动时加载导入字体并注册 @font-face 规则，确保用户之前导入的字
+// 体在 settings store 恢复字体选择前已可用。
+void getImportedFonts().then((fonts) => {
+  registerAllImportedFonts(fonts)
+})
+
+// ─── 键盘处理 ────────────────────────────────────────────────
+
+const route = useRoute()
+
+// ─── 移动端键盘适配（Android / iOS）─────────────────────────
+// 键盘弹出时把可见高度并入 --safe-area-inset-bottom（存在 .pb-safe/pb-safe-gap、
+// 对话框 padding、MusicPlayer 等 var() 用法，UI 自动上移让位）。
+// 仅移动端挂载：桌面端 visualViewport == window，这套逻辑是无操作死代码，不挂载。
+const vv = window.visualViewport
+// 基准底部安全区（无键盘时的 env 值，首个值即基线）
+let safeBaseBottom = 0
+let safeBaseInitialized = false
+// 当前已施加的抬升量（几何解算用自然位置 = 当前底部 + 已抬升量，避免自引用震荡）
+let currentLift = 0
+// 键盘状态兜底轮询：外部/配件键盘等场景 vv 事件偶发不触发，
+// 轮询 vv.height 变化触发重算（800ms 一次，开销可忽略）
+let kbGuardTimer: ReturnType<typeof setInterval> | null = null
+let lastKbSig = 0
+
+const lockScroll = () => {
+  window.scrollTo(0, 0)
+  if (document.documentElement.scrollTop) document.documentElement.scrollTop = 0
+  if (document.body.scrollTop) document.body.scrollTop = 0
+}
+
+// ─── 全局字体 ────────────────────────────────────────────────
+// 把设置中的自定义字体名同步到 <html> 的 --font-app；
+// 为空时 base.css 中的回退栈 --font-sans 生效。初始菜单 / 加载页因自带
+// 显式 font-family 不会继承此变量，自动保持原有字体。
+const settingsStore = useSettingsStore();
+function applyFont(font?: string) {
+  // 留空 → 软件默认（base.css 的 --font-sans 原版字体栈）
+  document.documentElement.style.setProperty("--font-app", font ? `'${font}'` : "");
+}
+
+// 页面级平移拦截（iOS 键盘收起后剩余的可滚动区）：根级 touchmove 直接 preventDefault，
+// 内部滚动容器（聊天记录/设置页等 overflow-* / custom-scroll）不受影响
+const preventRootTouchScroll = (e: TouchEvent) => {
+  const t = e.target as HTMLElement | null
+  if (
+    t &&
+    t.closest(
+      '.overflow-y-auto, .overflow-x-auto, .overflow-auto, .overflow-y-scroll, .overflow-x-scroll, .overflow-scroll, .custom-scroll, .scrollbar-thin, [data-scrollable]',
+    )
+  ) {
+    return
   }
+}
+
   watch(() => settingsStore.text.fontFamily, applyFont, { immediate: true });
 
   // 提前预取系统字体列表：在应用初始化时即调用一次 Rust 枚举并入内存缓存，
@@ -264,6 +333,70 @@
   if (isMainWindow) {
     useAsrInput();
   }
+  // 仿 Android：底部安全区 = 基线 + 抬升量
+  root.style.setProperty('--safe-area-inset-bottom', `${safeBaseBottom + currentLift}px`)
+
+  // 页面始终锚定原点（键盘弹出的系统 focus-scroll 与手势滚动都会被锁回）
+  lockScroll()
+}
+
+// 旋转/分屏后安全区基线失效：iPhone 竖屏底部 inset ≈34px、横屏 ≈21px（灵动岛移到左右），
+// iPad 台前调度改窗口尺寸同理。挂载时采样的基线在旋转后是旧值，这里强制重采样：
+//   1. 先清掉本模块写入的内联覆盖（iOS 回落 :root 的 env() 实时解析新值；
+//      Android 的 --safe-area-inset-* 由 MainActivity insets 监听注入，旋转后监听
+//      会重新触发注入，此处的临时清空无影响）
+//   2. 重置基线标记，下一次 sync 重读 env() 解析值作为新基线
+const handleOrientationChange = () => {
+  document.documentElement.style.removeProperty('--safe-area-inset-bottom')
+  safeBaseInitialized = false
+  currentLift = 0
+  syncVisualViewport()
+}
+
+// 仅主窗口挂载全局弹窗（通知/成就/对话确认），日志窗口等复用 App.vue 的窗口不弹
+const isMainWindow = getCurrentWindow().label === 'main'
+
+// ─── macOS 无边框标题栏（Overlay）顶部安全区 ────────────────────
+// 主窗口使用 titleBarStyle: Overlay（保留红绿灯、去掉标题栏）后，内容会顶到窗口
+// 上边缘，与 macOS 原生红绿灯/系统标题栏重叠。这里把「顶部安全区」变量抬升为
+// 一条固定的标题栏高度，让所有使用 var(--safe-area-inset-top) 的顶部组件统一让位，
+// 避免贴近窗口边缘/被红绿灯遮挡。仅 macOS 主窗口（且非桌宠模式）生效：
+// 桌宠模式会调用 set_decorations(false) 变成无边框小窗，此时红绿灯隐藏、不需要让位；
+// 其它平台与窗口保持原值。
+const MAC_TITLEBAR_INSET_PX = 40
+const isMac = isMacOS()
+// 桌宠模式复用主窗口（./pet），此时窗口为无边框小窗，顶部无需让位也无标题栏拖拽区
+const isMacOverlayWindow = computed(
+  () => isMac && isMainWindow && route.path !== '/pet',
+)
+function applyMacTitlebarInset() {
+  if (isMacOverlayWindow.value) {
+    document.documentElement.style.setProperty(
+      '--safe-area-inset-top',
+      `${MAC_TITLEBAR_INSET_PX}px`,
+    )
+  } else {
+    document.documentElement.style.removeProperty('--safe-area-inset-top')
+  }
+}
+applyMacTitlebarInset()
+watch(isMacOverlayWindow, applyMacTitlebarInset)
+
+// ASR 全局初始化（仅主窗口一次）：auto_listen 能量监测门控 + 事件监听。
+// useAsrInput 状态是模块级单例，GameDialog / ChatInput（桌宠）的 mic 按钮
+// 与这里共享同一会话。
+if (isMainWindow) {
+  useAsrInput()
+}
+
+const handleKeyDown = async (event: KeyboardEvent) => {
+  if (event.key === 'F11') {
+    event.preventDefault()
+
+    // Pet 路由时不允许全屏
+    if (route.path === '/pet') {
+      return
+    }
 
   const handleKeyDown = async (event: KeyboardEvent) => {
     if (event.key === "F11") {
@@ -424,27 +557,43 @@
 </script>
 
 <style>
-  :root {
-    /*全局变量*/
-    --accent-color: #79d9ff;
-    --menu-max-width: 1100px;
-    --menu-max-width-half: 550px;
-    /* 一个生动的天蓝色，可以根据你的品牌调整 */
-  }
+:root {
+  /*全局变量*/
+  --accent-color: #79d9ff;
+  --menu-max-width: 1100px;
+  --menu-max-width-half: 550px;
+  /* 一个生动的天蓝色，可以根据你的品牌调整 */
+}
 
-  /* 全局样式和字体 */
-  body,
-  html {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: transparent;
-  }
+/* 拖拽区覆盖整个窗口顶部，让无边框窗口（Overlay 标题栏）仍可用鼠标拖动。
+   macOS Overlay 下红绿灯悬浮于左上角，拖拽区避开红绿灯区域，防止误触窗口按钮。 */
+.mac-drag-region {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  /* 红绿灯(约 70px 宽)占据左上角，拖拽区从左 80px 起，避免抢走窗口按钮的点击 */
+  margin-left: 80px;
+  z-index: 60;
+  cursor: default;
+  -webkit-app-region: drag;
+  pointer-events: auto;
+}
 
-  #app {
-    /* 视口口径统一为动态视口（dvw/dvh，iOS 全屏态下 dvw 横屏自动排除左右安全区、dvh 竖屏含上下安全区）：
+/* 全局样式和字体 */
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+#app {
+  /* 视口口径统一为动态视口（dvw/dvh，iOS 全屏态下 dvw 横屏自动排除左右安全区、dvh 竖屏含上下安全区）：
      #app 铺满整个视觉视口（含状态栏/Home 指示器区域），使各屏壁纸全出血显示；
      安全区内缩由各边缘元素通过 env(safe-area-inset-*)（桌面/Android 桌面为 0px，零回归）自行处理——
      已在全局提供 --safe-area-inset-* 变量与 .pt-safe/.pb-safe 工具类（见 base.css）。 */
