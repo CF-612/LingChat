@@ -13,7 +13,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use sea_orm::DatabaseConnection;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 use crate::ai_service::game_system::game_status::GameStatus;
 use crate::ai_service::game_system::scene_store::SceneStore;
@@ -24,7 +24,7 @@ use crate::ai_service::message_system::processor::{
     EmotionSegment, MessageProcessor, UserMessageOutcome,
 };
 use crate::ai_service::message_system::producer::{SentenceItem, StreamProducer};
-use crate::ai_service::message_system::responses::{event_names, ReplyResponse};
+use crate::ai_service::message_system::responses::{ReplyResponse, event_names};
 use crate::ai_service::tools::registry::ToolRegistry;
 use crate::ai_service::tools::tool_loop::stream_with_tool_loop;
 use crate::ai_service::translator::Translator;
@@ -69,6 +69,10 @@ pub struct GeneratorDeps {
     /// 是否运行在编辑器试玩中。为 true 时回复带 `preview_gen` 标记，
     /// 前端据此丢弃中止后迟到的流式回复。
     pub is_preview: bool,
+    /// 当轮附带的多模态图片（`data:image/...;base64,...` data URL）。
+    /// 由「该模型支持原生识图」的对话路径设置：图片仅拼接进**当轮** LLM 上下文，
+    /// 不写入角色记忆，从源头控制上下文/缓存占用。
+    pub transient_image: Option<String>,
 }
 
 /// `process_message` 各步骤间传递的用户消息上下文。
@@ -265,11 +269,7 @@ impl MessageGenerator {
         }
 
         match self
-            .run_pipeline(
-                context,
-                user_message.to_string(),
-                user_msg_seq,
-            )
+            .run_pipeline(context, user_message.to_string(), user_msg_seq)
             .await
         {
             Ok(acc) => {
@@ -277,14 +277,14 @@ impl MessageGenerator {
                     events::emit_thinking(&self.deps.app, false);
                 }
                 Ok(acc)
-            }
+            },
             Err(e) => {
                 events::emit_error(&self.deps.app, &e);
                 if !self.deps.suppress_thinking {
                     events::emit_thinking(&self.deps.app, false);
                 }
                 Err(e)
-            }
+            },
         }
     }
 
@@ -435,6 +435,24 @@ impl MessageGenerator {
                 .display_name
                 .clone()
         };
+        // 原生多模态识图：把当轮图片作为一条独立的用户消息拼进 LLM 上下文，
+        // 仅本次请求可见，不回写记忆。放在末尾（紧跟最新用户输入之后的视觉提示），
+        // 让模型把图片与最近的用户语境关联起来。
+        let context = if let Some(image) = self.deps.transient_image.clone() {
+            let mut ctx = context;
+            let gs_guard = self.deps.game_status.lock().await;
+            let user_name = gs_guard.player.user_name.clone();
+            drop(gs_guard);
+            let marker = if user_message.trim().is_empty() {
+                format!("（用户「{}」发来一张图片，请查看图片内容。）", user_name)
+            } else {
+                format!("【图片】用户「{}」发来一张图片，请结合图片内容回复。", user_name)
+            };
+            ctx.push(LlmMessage::user_with_image(marker, image));
+            ctx
+        } else {
+            context
+        };
         let tool_loop_result = stream_with_tool_loop(
             &self.deps.llm,
             &self.deps.tool_registry,
@@ -522,7 +540,7 @@ impl MessageGenerator {
                         Err(e) => {
                             tracing::error!("consumer {cid} 处理句子失败: {e}");
                             None
-                        }
+                        },
                     };
                     let _ = publish_tx.send((index, resp)).await;
                     if is_final {
@@ -561,9 +579,10 @@ impl MessageGenerator {
                 for msg in tool_msgs.iter().rev() {
                     let (attribute, content, tool_call) = match msg.role.as_str() {
                         "assistant" => {
-                            let tool_call = msg.tool_calls.as_ref().map(|calls| {
-                                serde_json::to_string(calls).unwrap_or_default()
-                            });
+                            let tool_call = msg
+                                .tool_calls
+                                .as_ref()
+                                .map(|calls| serde_json::to_string(calls).unwrap_or_default());
                             (LineAttribute::Assistant, msg.content.clone(), tool_call)
                         },
                         "tool" => (
@@ -572,7 +591,8 @@ impl MessageGenerator {
                                 "tool_call_id": msg.tool_call_id,
                                 "result": serde_json::from_str::<serde_json::Value>(&msg.content)
                                     .unwrap_or(serde_json::Value::String(msg.content.clone())),
-                            })).unwrap_or_default(),
+                            }))
+                            .unwrap_or_default(),
                             None,
                         ),
                         _ => continue,
@@ -672,9 +692,15 @@ pub(crate) async fn consume_sentence(
     enrich_segments(deps, &mut segments).await?;
 
     // 3. 构建前端响应
-    let mut response =
-        build_reply_response(deps, &segments, user_message, is_final, user_message_seq, overrides)
-            .await?;
+    let mut response = build_reply_response(
+        deps,
+        &segments,
+        user_message,
+        is_final,
+        user_message_seq,
+        overrides,
+    )
+    .await?;
 
     // 3.5 最终句：快照本轮思考链，挂载到响应与台词行（供历史对话展示思考过程）
     if is_final {
@@ -712,6 +738,15 @@ fn tts_translation_language(tts_type: &str, voice_lang: &str) -> Option<&'static
         ("indextts2", "es") => Some("es"),
         ("indextts2", "ar") => Some("ar"),
         ("gsv" | "opentts", "ko") => Some("ko"),
+        // CosyVoice 多语言自动检测：voice_lang 为 en/ko/de/fr/ru/pt 时先翻译成目标语言
+        // 再合成，否则会朗读主模型默认附带的日文译文（japanese_text）；
+        // ja 例外——主模型已自带日文译文，无需重译
+        ("cosyvoice", "en") => Some("en"),
+        ("cosyvoice", "ko") => Some("ko"),
+        ("cosyvoice", "de") => Some("de"),
+        ("cosyvoice", "fr") => Some("fr"),
+        ("cosyvoice", "ru") => Some("ru"),
+        ("cosyvoice", "pt") => Some("pt"),
         _ => None,
     }
 }
@@ -736,7 +771,6 @@ fn needs_japanese_translation(segments: &[EmotionSegment]) -> bool {
             && !looks_like_japanese(segment.japanese_text.trim())
     })
 }
-
 
 /// Step B: 翻译与语音生成。
 async fn enrich_segments(deps: &SentenceDeps, segments: &mut [EmotionSegment]) -> Result<()> {
@@ -846,7 +880,11 @@ async fn build_reply_response(
     response.is_final = is_final;
     response.user_message_seq = user_message_seq;
     // 试玩标记：前端据此丢弃中止后迟到的流式回复（非试玩为 None，不序列化）
-    response.preview_gen = if deps.is_preview { Some(deps.generation) } else { None };
+    response.preview_gen = if deps.is_preview {
+        Some(deps.generation)
+    } else {
+        None
+    };
 
     // 固定台词覆盖：dialogue 事件传入显示名/副标题/时长，生成路径全为默认值
     if let Some(dn) = &overrides.display_name {

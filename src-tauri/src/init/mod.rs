@@ -12,13 +12,14 @@ use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Mutex;
 
+use crate::ChatComponents;
 use crate::ai_service::emotion::EmotionClassifier;
 use crate::ai_service::game_system::persistent_memory_system::MemorySectionLimits;
+use crate::ai_service::llm::LlmSlot;
 use crate::ai_service::llm::provider_config::{
     build_llm_client_from_provider, migrate_if_needed, migrate_legacy_vision_keys,
     resolve_chat_provider, resolve_translate_provider,
 };
-use crate::ai_service::llm::LlmSlot;
 use crate::ai_service::message_system::processor::{MessageProcessor, ProcessorOptions};
 use crate::ai_service::service::{AIService, SharedAIService};
 use crate::ai_service::translator::Translator;
@@ -28,7 +29,6 @@ use crate::config::{self, AppConfig};
 use crate::db;
 use crate::db::managers::role_repo::RoleRepo;
 use crate::utils::prompt::PromptOptions;
-use crate::ChatComponents;
 
 pub async fn initialize(
     app: &App,
@@ -67,10 +67,11 @@ pub async fn initialize(
     // 提前加载配置 + 构建 LlmClient（AIService 的子成员 GameRoleManager 需要它）
     let app_config = AppConfig::load(&app.handle()).unwrap_or_default();
     tracing::info!(
-        "MemoryBank 配置: enabled={}, update_interval={}, recent_window={}, limits=[{},{},{},{}]（记忆设置需重启生效）",
+        "MemoryBank 配置: enabled={}, update_interval={}, recent_window={}, inject_continue_user={}, limits=[{},{},{},{}]（记忆设置需重启生效）",
         app_config.use_persistent_memory,
         app_config.memory_update_interval,
         app_config.memory_recent_window,
+        app_config.memory_inject_continue_user,
         app_config.memory_short_term_max_chars,
         app_config.memory_long_term_max_chars,
         app_config.memory_user_info_max_chars,
@@ -101,6 +102,7 @@ pub async fn initialize(
             user_info: app_config.memory_user_info_max_chars as usize,
             promises: app_config.memory_promises_max_chars as usize,
         },
+        app_config.memory_inject_continue_user,
     )
     .await;
 
@@ -111,7 +113,6 @@ pub async fn initialize(
         output_sec_lang: app_config.llm_output_sec_lang,
         no_emotion_limit: app_config.no_emotion_limit_prompt,
     };
-    ai_service.import_settings(settings, prompt_options).await;
 
     // 从 session store 读取各角色的上次服装，注入 GameRoleManager
     {
@@ -129,13 +130,11 @@ pub async fn initialize(
         ai_service.set_clothes_overrides(overrides).await;
     }
 
-    ai_service.init_game_status().await?;
+    ai_service
+        .init_game_status(character_id, prompt_options)
+        .await?;
 
-    tracing::info!(
-        "AIService 初始化完成: character_id={:?}, ai_name={}",
-        ai_service.character_id,
-        ai_service.ai_name,
-    );
+    tracing::info!("AIService 初始化完成");
 
     let ai_service: SharedAIService = Arc::new(Mutex::new(ai_service));
 
@@ -206,14 +205,14 @@ pub async fn init_asr(
         Ok(p) => {
             providers.insert(cfg.active_provider.clone(), p);
             tracing::info!("[ASR] provider {} 已构建", cfg.active_provider);
-        }
+        },
         Err(e) => {
             tracing::warn!(
                 "[ASR] provider {} 构建失败: {}",
                 cfg.active_provider,
                 e.i18n_code()
             );
-        }
+        },
     }
 
     let vad = AsrVad::load(app)?;
@@ -244,17 +243,17 @@ fn load_emotion_classifier(
             Ok(clf) => {
                 tracing::info!("情绪分类器加载成功: {}", dir.display());
                 return Some(Arc::new(clf));
-            }
+            },
             Err(e) => {
                 tracing::warn!(
                     "情绪分类器加载失败 ({}), 回退为禁用状态: {e}",
                     dir.display()
                 );
-            }
+            },
         },
         _ => {
             tracing::warn!("未找到情绪模型目录, 情绪分类器将禁用");
-        }
+        },
     }
 
     None

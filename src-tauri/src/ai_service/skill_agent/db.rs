@@ -128,11 +128,10 @@ pub async fn insert_message(
         prompt_tokens: Set(usage.map(|u| u.prompt_tokens as i64)),
         completion_tokens: Set(usage.map(|u| u.completion_tokens as i64)),
         cached_tokens: Set(usage.map(|u| u.cached_tokens as i64)),
-        tool_calls: Set(
-            msg.tool_calls
-                .as_ref()
-                .map(|tcs| serde_json::to_string(tcs).unwrap_or_default()),
-        ),
+        tool_calls: Set(msg
+            .tool_calls
+            .as_ref()
+            .map(|tcs| serde_json::to_string(tcs).unwrap_or_default())),
         tool_call_id: Set(msg.tool_call_id.clone()),
         created_at: Set(now),
     };
@@ -194,5 +193,6 @@ pub fn message_to_llm(m: &skill_agent_message::Model) -> LlmMessage {
             .as_ref()
             .and_then(|s| serde_json::from_str(s).ok()),
         tool_call_id: m.tool_call_id.clone(),
+        image_data_url: None,
     }
 }

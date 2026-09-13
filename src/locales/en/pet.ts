@@ -27,13 +27,20 @@ export default {
     particleBA: "Starglow",
     volumeTitle: "Desktop Pet Volume",
     volumeReset: "Reset to Default Volume",
+    live2dFpsTitle: "Live2D Render FPS",
+    live2dFpsDesc:
+      "Capping the character animation FPS greatly reduces idle CPU usage (0 or empty = unlimited)",
+    live2dFpsUnlimited: "Unlimited",
+    live2dFpsCustom: "Custom",
+    live2dFpsReset: "Reset to Default FPS",
   },
   history: {
     title: "Chat History",
     desc: "Look back on your past chats with them~",
     empty: "No chat history yet — go say hi! (*^▽^*)",
     backtrack: "Rewind",
-    backtrackTitle: "Rewind to before this message (this message and all later chats will be cleared)",
+    backtrackTitle:
+      "Rewind to before this message (this message and all later chats will be cleared)",
     thinking: "Thinking ({count} chars)",
     playVoice: "Play Voice",
     generateVoice: "Generate Voice",
@@ -44,7 +51,8 @@ export default {
     you: "You",
     mysteryVoice: "Mysterious Voice",
     backtrackConfirmTitle: "Confirm Rewind",
-    backtrackConfirmMessage: "Rewind to this chat? This message and everything after it will be deleted, and it can't be undone.",
+    backtrackConfirmMessage:
+      "Rewind to this chat? This message and everything after it will be deleted, and it can't be undone.",
     backtrackFailed: "Rewind failed: {error}",
     emotionTitle: "Emotion: {tag}",
   },
@@ -52,7 +60,8 @@ export default {
     title: "Proactive Chat Behavior",
     desc: "Configure the proactive system and schedule policies based on desktop environment awareness",
     applyTitle: "Reload & Apply Configuration",
-    applyDesc: "After clicking Save, the latest environment variables will be synced to the underlying service and the proactive system will restart.",
+    applyDesc:
+      "After clicking Save, the latest environment variables will be synced to the underlying service and the proactive system will restart.",
     save: "Save",
     saving: "Saving...",
     error: "Error: {message}",
@@ -74,4 +83,4 @@ export default {
     newGroup: "New Task Group",
     newTask: "New Task",
   },
-}
+};

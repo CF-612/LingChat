@@ -3,12 +3,13 @@
 //! 对标 Python 版 `ling_chat/core/llm_providers/` 的工厂+ABC 模式。
 //! `LlmClient` 是薄包装，具体协议由 `LlmProvider` trait 实现处理。
 
+pub mod codex;
 pub mod error;
 pub(crate) mod factory;
 mod provider;
 pub mod provider_config;
 mod providers;
-pub mod codex;
+pub mod vision;
 
 // 兼容别名：既有 `llm::codex_auth::...` 路径继续可用（模块化后为 codex::auth）
 pub use codex::auth as codex_auth;
@@ -20,7 +21,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use futures_util::{Stream, StreamExt};
 use reqwest::Client;
 use tokio::sync::RwLock;
@@ -64,6 +65,9 @@ pub struct LlmConfig {
     pub reasoning_effort: Option<String>,
     /// Codex Fast Mode（1.5× 速度，额度消耗更快）= Responses API 的 `service_tier: "priority"`。
     pub fast_mode: bool,
+    /// 该模型是否支持原生多模态识图。为 true 时，用户发图可直接携带图片走对话
+    /// 模型完成识图，而无需先用旁白模型转述。默认 false。
+    pub support_vision: bool,
 }
 
 impl LlmConfig {
@@ -179,7 +183,7 @@ impl LlmClient {
                 self.provider
                     .complete_stream_with_tools(&self.http, messages, definitions, tool_choice)
                     .await?
-            }
+            },
             None => self.provider.complete_stream(&self.http, messages).await?,
         };
         let timeout_secs = self.cfg.timeout_secs;
