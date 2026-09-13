@@ -676,6 +676,7 @@ export default {
       sakura: "Sakura",
       snow: "Snow",
       fireworks: "Fireworks",
+      ba: "Starglow",
     },
     animation: {
       switchTitle: "Animation Switches",
