@@ -107,9 +107,8 @@ pub fn spawn_hit_test_poll(window: tauri::WebviewWindow) {
                     // 追踪平滑度，因此只在位移 ≥1px 时发送。
                     let moved = match last_emitted {
                         Some((lx, ly)) => {
-                            (logical_x - lx).abs() >= 1.0
-                                || (logical_y - ly).abs() >= 1.0
-                        }
+                            (logical_x - lx).abs() >= 1.0 || (logical_y - ly).abs() >= 1.0
+                        },
                         None => true,
                     };
                     if moved {

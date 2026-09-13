@@ -119,6 +119,7 @@ impl SaveRepo {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn update_save_last_message(
         db: &DatabaseConnection,
         save_id: i32,
