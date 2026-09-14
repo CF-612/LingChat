@@ -173,9 +173,13 @@ pub enum LineAttribute { User, Assistant, System, Tool }
 
 consumer 池并发执行，`publish_ordered` 按 index 严格递增推进。若某个 consumer **panic** 且没有把该 index 以 `response: None` 交回 publisher，栅栏的 `oneshot::Sender` 会卡在 `pending` map 里既不发也不 drop → `tool_loop` 的 `fence_rx.await` 永久 pending。旧代码丢一句只是少一句话，新代码是整轮挂住。建议给 `fence_rx.await` 加超时并在超时后 fail-open/fail-closed 二者中选定一个明确语义。
 
-### 🟠 中：用户可感知的 UX 回退
+### 🟠 中：收尾语义的行为变更
 
-模型在工具后**原样复读前导台词**是本项目自己文档化过的常见现象（`producer.rs:104-106` 有注释）。旧代码会把前导再当 final 发一次让本轮收尾；新代码在此判定 `sent_final=false` → 走 `emit_error("模型没有返回完整的最终内容，请再试一次")` 并重置输入态（`generator.rs:695-705`）。用户体感可能是"台词明明显示了，却弹错误提示"。这个行为变更被测试固化了，但**属于产品决策，不该由 bugfix PR 单方面决定**。
+模型在工具后**原样复读前导台词**是本项目自己文档化过的常见现象（`producer.rs:104-106` 有注释）。旧代码在这条路径上会把前导再当 final 发一次让本轮收尾；新代码在此判定 `sent_final=false` → 走 `emit_error("模型没有返回完整的最终内容，请再试一次")` 并重置输入态（`generator.rs:695-705`）。这个行为变更被测试固化了，但**属于产品决策，不该由 bugfix PR 单方面决定**。
+
+> **订正（实施阶段核实）**：上面这段只对"工具后复读前导"成立。在"工具后**什么都不产出**"这条路径上，旧代码**一条都不发**（不是重发）——`dispatch_sentence` 的 `mem::take` 已把内容消耗掉，EOF 落到 `pending_sentence` 为 `None` 的分支，整轮没有任何 `is_final=true`；而 `generator.rs` 的空回复兜底判的是 `accumulated` 原文非空，模型只要在工具前说过话就不会触发。**所以旧行为是"静默卡死"（前端永远停在等待态），PR 那条报错路径是修 bug，不是引入 UX 回归。**
+>
+> 我们自己实现的最小修复取了第三种语义：**不重放、不报错，只补一次 `status:reset` 温和复位**（`generator.rs` 里 `!published_final` 时），并为此把 `events::emit_error` 里的状态复位拆成了可复用的 `events::emit_status_reset`。
 
 ### 🟠 中：一条坏记忆行会让整个存档打不开
 
