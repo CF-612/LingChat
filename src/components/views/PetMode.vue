@@ -6,13 +6,14 @@
     @mouseleave="handleMouseLeave"
     class="relative flex h-(--app-height) w-(--app-width) flex-col items-center justify-start overflow-hidden bg-transparent transition-none select-none"
   >
-    <!-- DialogueBox 区域 -->
+    <!-- 装饰带（气泡/通知）：高度完全随内容（无预留）→ 顶部永远没有透明空间：
+         默认在宠物上方（气泡吸顶，宠物被往下让位）；设置=下方时夹在宠物与输入框之间（气泡贴宠物下沿） -->
     <div
       class="flex w-full shrink-0 flex-col justify-end bg-transparent transition-none"
-      :style="{ height: 'var(--dialog-h)' }"
+      :style="{ order: bubbleBelow ? 1 : 0 }"
     >
       <PetNotification />
-      <div class="mt-1 flex items-end justify-center">
+      <div class="flex items-end justify-center" :class="{ 'mb-1': bubbleVisible }">
         <DialogueBox ref="gameDialogRef" @player-continued="manualTriggerContinue" />
       </div>
     </div>
@@ -35,14 +36,17 @@
       </div>
     </DragArea>
 
-    <!-- ChatInput 区域 -->
+    <!-- ChatInput 区域（始终贴住上方元素：默认在宠物正下方，设置=下方时在气泡带之下） -->
     <div
       ref="chatContainer"
       class="flex w-full shrink-0 items-start justify-center bg-transparent transition-none"
-      :style="{ height: 'var(--chat-h)' }"
+      :style="{ height: 'var(--chat-h)', order: bubbleBelow ? 2 : 0 }"
     >
       <ChatInput ref="ChatInputRef" :visible="showChatInput" />
     </div>
+
+    <!-- 余量吸收带：只在“下方”模式接管气泡带腾出的空间，保证窗口总高恒定（不上报 solid 区域） -->
+    <div class="w-full flex-1" :style="{ order: bubbleBelow ? 3 : 0 }"></div>
   </div>
 </template>
 
@@ -64,7 +68,7 @@ import DialogueBox from "../pet/DialogueBox.vue";
 import DragArea from "../pet/DragArea.vue";
 import GameRolesStage from "../pet/GameRolesStage.vue";
 import PetNotification from "../pet/PetNotification.vue";
-import { BASE_AVATAR_SIZE, CHAT_BASE_H, DIALOG_MAX_BASE } from "../pet/constants";
+import { AVATAR_BAND_BASE, CHAT_BASE_H, DIALOG_MAX_BASE, PET_WIDTH_BASE } from "../pet/constants";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -80,25 +84,24 @@ const chatContainer = ref<HTMLElement | null>(null);
 const gameDialogRef = ref<InstanceType<typeof DialogueBox> | null>(null);
 const ChatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
+// 气泡/通知位置（用户设置）：above = 宠物上方（默认），below = 宠物与输入框之间
+const bubbleBelow = computed(() => settingsStore.pet?.bubbleSide === "below");
+// 气泡当前是否有内容（显隐与点击穿透上报共用）
+const bubbleVisible = computed(
+  () => gameStore.currentStatus === "responding" && gameStore.currentLine.trim() !== "",
+);
+
 const appStyleVars = computed(() => {
   const scale = settingsStore.pet?.scale || 1.0;
-  const layout = calcWindowLayout(scale);
   return {
     "--pet-ui-scale": scale.toString(),
-    "--app-width": `${layout.width}px`,
-    "--app-height": `${layout.height}px`,
-    "--avatar-size": `${Math.round(BASE_AVATAR_SIZE * scale)}px`,
+    "--app-width": `${Math.round(PET_WIDTH_BASE * scale)}px`,
+    "--app-height": `${Math.round((AVATAR_BAND_BASE + CHAT_BASE_H + DIALOG_MAX_BASE) * scale)}px`,
+    "--avatar-size": `${Math.round(AVATAR_BAND_BASE * scale)}px`,
     "--chat-h": `${Math.round(CHAT_BASE_H * scale)}px`,
     "--dialog-h": `${Math.round(DIALOG_MAX_BASE * scale)}px`,
   };
 });
-
-const calcWindowLayout = (scale: number): { width: number; height: number } => {
-  const S = Math.round(BASE_AVATAR_SIZE * scale);
-  const chatH = Math.round(CHAT_BASE_H * scale);
-  const dialogH = Math.round(DIALOG_MAX_BASE * scale);
-  return { width: S, height: S + dialogH + chatH };
-};
 
 const applyWindowLayout = async () => {
   try {
@@ -116,6 +119,7 @@ let volumeUnlisten: (() => void) | null = null;
 let live2dFpsUnlisten: (() => void) | null = null;
 let dialogHistoryUnlisten: (() => void) | null = null;
 let cursorUnlisten: (() => void) | null = null;
+let bubbleSideUnlisten: (() => void) | null = null;
 
 onMounted(async () => {
   const appWindow = getCurrentWindow();
@@ -170,6 +174,14 @@ onMounted(async () => {
     setShowChatInput(x >= 0 && y >= 0 && x <= window.innerWidth && y <= window.innerHeight);
   });
 
+  // 设置窗口改了气泡位置：即时换位（纯 CSS 换 order，不动窗口尺寸，不会闪）
+  bubbleSideUnlisten = await appWindow.listen<{ side: "above" | "below" }>(
+    "pet-bubble-side-changed",
+    (event) => {
+      if (event.payload?.side) settingsStore.pet.bubbleSide = event.payload.side;
+    },
+  );
+
   // 设置透明背景的 body 属性样式（额外防护）
   document.body.style.backgroundColor = "transparent";
   document.documentElement.style.backgroundColor = "transparent";
@@ -184,11 +196,7 @@ onMounted(async () => {
     const rects = [];
 
     // 如果对话气泡正在显示，则加入 solid region（用气泡元素精确 rect，避免包住整个对话框）
-    if (
-      gameDialogRef.value?.bubbleRef &&
-      gameStore.currentStatus === "responding" &&
-      gameStore.currentLine.trim() !== ""
-    ) {
+    if (gameDialogRef.value?.bubbleRef && bubbleVisible.value) {
       const r = gameDialogRef.value.bubbleRef.getBoundingClientRect();
       if (r.height > 0) {
         rects.push({ x: r.x, y: r.y, width: r.width, height: r.height });
@@ -252,6 +260,7 @@ onUnmounted(() => {
   if (live2dFpsUnlisten) live2dFpsUnlisten();
   if (dialogHistoryUnlisten) dialogHistoryUnlisten();
   if (cursorUnlisten) cursorUnlisten();
+  if (bubbleSideUnlisten) bubbleSideUnlisten();
 
   if (hitTestInterval !== undefined) {
     window.clearInterval(hitTestInterval);
