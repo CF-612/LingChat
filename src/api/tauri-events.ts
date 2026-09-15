@@ -392,6 +392,10 @@ export function initializeTauriEventListeners() {
     eventQueue.addEvent(asEvent(event.payload, { type: "choice", defaultDuration: 0 }));
   });
 
+  listen("script:progress", (event) => {
+    eventQueue.addEvent(asEvent(event.payload, { type: "progress", defaultDuration: 0 }));
+  });
+
   listen("script:end", (event) => {
     console.log("[Tauri] script:end", event.payload);
     eventQueue.addEvent(

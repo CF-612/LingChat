@@ -607,4 +607,17 @@ impl SaveRepo {
             .map_err(|e| anyhow!("{e}"))?;
         Ok(())
     }
+
+    /// 清除存档关联的剧本进度行。存档时若当前无剧本在跑，必须清掉该存档
+    /// 早年关联的旧行，否则读档会把一个早已结束的剧本误续跑起来。
+    pub async fn clear_running_script(db: &DatabaseConnection, save_id: i32) -> Result<()> {
+        let save_model = Self::get_save_by_id(db, save_id)
+            .await?
+            .context("Save not found")?;
+        if let Some(rs_id) = save_model.running_script_id {
+            Self::update_save_running_script(db, save_id, None).await?;
+            Self::delete_running_script(db, rs_id).await?;
+        }
+        Ok(())
+    }
 }
