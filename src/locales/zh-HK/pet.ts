@@ -22,6 +22,7 @@ export default {
     scaleTitle: "桌寵大細設定",
     scaleReset: "還原預設尺寸",
     bubbleSideTitle: "氣泡彈出位置",
+    bubbleSideAuto: "自動",
     bubbleSideAbove: "寵物上方",
     bubbleSideBelow: "寵物下方",
     particleTitle: "背景粒子效果 (冇粒子會暢順啲)",

@@ -52,11 +52,11 @@
 
 <script setup lang="ts">
 import { useGameStore } from "@/stores/modules/game";
-import { useSettingsStore } from "@/stores/modules/settings";
+import { useSettingsStore, type BubbleSide } from "@/stores/modules/settings";
 import { useUIStore } from "@/stores/modules/ui/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -84,8 +84,38 @@ const chatContainer = ref<HTMLElement | null>(null);
 const gameDialogRef = ref<InstanceType<typeof DialogueBox> | null>(null);
 const ChatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
-// 气泡/通知位置（用户设置）：above = 宠物上方（默认），below = 宠物与输入框之间
-const bubbleBelow = computed(() => settingsStore.pet?.bubbleSide === "below");
+// 气泡/通知位置（用户设置）：above = 宠物上方，below = 宠物与输入框之间，auto = 按宠物在屏幕中的位置自动选
+const bubbleSide = computed(() => settingsStore.pet?.bubbleSide ?? "above");
+const autoBubbleBelow = ref(false);
+// 自动判据看宠物圆心落在工作区上半还是下半：与气泡布局本身无关，不会来回抖动
+const bubbleBelow = computed(
+  () => bubbleSide.value === "below" || (bubbleSide.value === "auto" && autoBubbleBelow.value),
+);
+
+let autoSideTimer: number | undefined;
+const refreshAutoBubbleSide = async () => {
+  if (bubbleSide.value !== "auto") return;
+  try {
+    const [pos, monitor] = await Promise.all([
+      getCurrentWindow().outerPosition(),
+      currentMonitor(),
+    ]);
+    if (!monitor) return;
+    const { position, size } = monitor.workArea;
+    // 宠物可见圆心（窗口顶边 + 头像带一半）落在工作区上半 → 气泡下置
+    const petCenterY =
+      pos.y + (AVATAR_BAND_BASE * (settingsStore.pet?.scale ?? 1) * monitor.scaleFactor) / 2;
+    autoBubbleBelow.value = petCenterY < position.y + size.height / 2;
+  } catch {
+    // 拿不到显示器信息时保持上一次判定
+  }
+};
+
+// 原生拖拽期间 onMoved 会高频触发，去抖后再算
+const scheduleAutoBubbleSide = () => {
+  if (autoSideTimer !== undefined) window.clearTimeout(autoSideTimer);
+  autoSideTimer = window.setTimeout(() => void refreshAutoBubbleSide(), 150);
+};
 // 气泡当前是否有内容（显隐与点击穿透上报共用）
 const bubbleVisible = computed(
   () => gameStore.currentStatus === "responding" && gameStore.currentLine.trim() !== "",
@@ -120,6 +150,7 @@ let live2dFpsUnlisten: (() => void) | null = null;
 let dialogHistoryUnlisten: (() => void) | null = null;
 let cursorUnlisten: (() => void) | null = null;
 let bubbleSideUnlisten: (() => void) | null = null;
+let movedUnlisten: (() => void) | null = null;
 
 onMounted(async () => {
   const appWindow = getCurrentWindow();
@@ -175,12 +206,16 @@ onMounted(async () => {
   });
 
   // 设置窗口改了气泡位置：即时换位（纯 CSS 换 order，不动窗口尺寸，不会闪）
-  bubbleSideUnlisten = await appWindow.listen<{ side: "above" | "below" }>(
+  bubbleSideUnlisten = await appWindow.listen<{ side: BubbleSide }>(
     "pet-bubble-side-changed",
     (event) => {
       if (event.payload?.side) settingsStore.pet.bubbleSide = event.payload.side;
     },
   );
+
+  // 自动模式：窗口移动（原生拖拽、换屏）后重算气泡在上还是在下
+  movedUnlisten = await appWindow.onMoved(scheduleAutoBubbleSide);
+  await refreshAutoBubbleSide();
 
   // 设置透明背景的 body 属性样式（额外防护）
   document.body.style.backgroundColor = "transparent";
@@ -238,6 +273,9 @@ watch(
   },
 );
 
+// 设置里切到/切出“自动”时立即重算一次
+watch(bubbleSide, () => void refreshAutoBubbleSide());
+
 // 监听 dialogHistory 变化，推送给设置窗口
 watch(
   () => gameStore.dialogHistory.length,
@@ -261,6 +299,8 @@ onUnmounted(() => {
   if (dialogHistoryUnlisten) dialogHistoryUnlisten();
   if (cursorUnlisten) cursorUnlisten();
   if (bubbleSideUnlisten) bubbleSideUnlisten();
+  if (movedUnlisten) movedUnlisten();
+  if (autoSideTimer !== undefined) window.clearTimeout(autoSideTimer);
 
   if (hitTestInterval !== undefined) {
     window.clearInterval(hitTestInterval);

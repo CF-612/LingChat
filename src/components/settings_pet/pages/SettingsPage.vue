@@ -73,7 +73,11 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 // 替换为你项目中实际存在的 store 路径
-import { DEFAULT_SETTINGS, useSettingsStore } from "../../../stores/modules/settings";
+import {
+  DEFAULT_SETTINGS,
+  useSettingsStore,
+  type BubbleSide,
+} from "../../../stores/modules/settings";
 
 const PET_SCALE_DEFAULT = 1.0;
 const PET_SCALE_MAX = 1.3;
@@ -201,7 +205,7 @@ const resetLive2dFps = async () => {
   await updateLive2dFps(DEFAULT_SETTINGS.pet.live2dFps);
 };
 
-const updateBubbleSide = async (side: "above" | "below") => {
+const updateBubbleSide = async (side: BubbleSide) => {
   settingsStore.pet.bubbleSide = side;
   await appWindow.emit(PET_BUBBLE_SIDE_EVENT, { side });
 };

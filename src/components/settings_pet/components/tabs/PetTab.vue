@@ -411,6 +411,7 @@ import {
 import { useUIStore } from "../../../../stores/modules/ui/ui";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { PARTICLE_EFFECTS } from "@/components/game/standard/particles";
+import type { BubbleSide } from "@/stores/modules/settings";
 
 const props = defineProps<{
   isDarkMode: boolean;
@@ -420,8 +421,8 @@ const props = defineProps<{
   PET_SCALE_MAX: number;
   /** Live2D 渲染帧率上限（0 = 不限制） */
   live2dFps: number;
-  /** 气泡/通知位置：above = 输入框上方，below = 输入框下方 */
-  petBubbleSide: "above" | "below";
+  /** 气泡/通知位置：above / below / auto */
+  petBubbleSide: BubbleSide;
 }>();
 
 const emit = defineEmits<{
@@ -431,7 +432,7 @@ const emit = defineEmits<{
   resetVolume: [];
   updateLive2dFps: [value: number];
   resetLive2dFps: [];
-  updateBubbleSide: [value: "above" | "below"];
+  updateBubbleSide: [value: BubbleSide];
 }>();
 
 const uiStore = useUIStore();
@@ -492,6 +493,7 @@ const onVolumeInput = (event: Event) => {
 
 // ===== 气泡位置 =====
 const bubbleSideOptions = computed(() => [
+  { label: t("pet.petTab.bubbleSideAuto"), value: "auto" as const },
   { label: t("pet.petTab.bubbleSideAbove"), value: "above" as const },
   { label: t("pet.petTab.bubbleSideBelow"), value: "below" as const },
 ]);
