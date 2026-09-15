@@ -166,6 +166,7 @@ import { MenuPage, MenuItem } from "../../ui";
 import { Input } from "../../base";
 import { useGameStore } from "../../../stores/modules/game";
 import { applyWebInitData } from "../../../stores/modules/game/actions";
+import { eventQueue } from "../../../core/events/event-queue";
 import { useUIStore } from "../../../stores/modules/ui/ui";
 import { useDialogStore } from "../../../stores/modules/ui/dialog";
 import { eventQueue } from "@/core/events/event-queue";
@@ -330,6 +331,8 @@ const handleLoadSave = async (saveId: number) => {
   try {
     const gameInfo = await invoke<WebInitData>("load_save", { saveId });
     applyWebInitData(gameStore.$state, gameInfo);
+    
+    // 此处解决了 剧本状态持久化和自动事件clear，注意之后出问题了可以看这里的代码
     gameStore.scriptReadCursor = null;
     // 存档带剧本进度时后端已从存档点续跑引擎，前端同步回到剧情模式；否则回到自由对话
     if (gameInfo.active_script) {
@@ -337,6 +340,9 @@ const handleLoadSave = async (saveId: number) => {
     } else {
       gameStore.exitStoryMode();
     }
+    // 读档后丢弃旧会话残留事件队列（防止旧角色未说完的回复串进新存档对话，issue #796）
+    eventQueue.clear();
+    eventQueue.resume();
     uiStore.showSuccess({
       title: t("settings.save.msg.loadSuccessTitle"),
       message: t("settings.save.msg.loadSuccessMsg"),
