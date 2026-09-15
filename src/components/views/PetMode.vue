@@ -9,6 +9,7 @@
     <!-- 装饰带（气泡/通知）：高度完全随内容（无预留）→ 顶部永远没有透明空间：
          默认在宠物上方（气泡吸顶，宠物被往下让位）；设置=下方时夹在宠物与输入框之间（气泡贴宠物下沿） -->
     <div
+      ref="decorBand"
       class="flex w-full shrink-0 flex-col justify-end bg-transparent transition-none"
       :style="{ order: bubbleBelow ? 1 : 0 }"
     >
@@ -57,7 +58,7 @@ import { useUIStore } from "@/stores/modules/ui/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useFileDrop } from "../pet/useFileDrop";
@@ -81,6 +82,7 @@ const { isDragging, hasFile } = useFileDrop();
 
 const avatarContainer = ref<HTMLElement | null>(null);
 const chatContainer = ref<HTMLElement | null>(null);
+const decorBand = ref<HTMLElement | null>(null);
 const gameDialogRef = ref<InstanceType<typeof DialogueBox> | null>(null);
 const ChatInputRef = ref<InstanceType<typeof ChatInput> | null>(null);
 
@@ -116,6 +118,69 @@ const scheduleAutoBubbleSide = () => {
   if (autoSideTimer !== undefined) window.clearTimeout(autoSideTimer);
   autoSideTimer = window.setTimeout(() => void refreshAutoBubbleSide(), 150);
 };
+
+// —— 换位 / 推挤动效（FLIP 思路）：flex 的 order 与“内容撑高”都无法过渡 ——
+// 换位：切换前记下位置，反向 transform 起手再弹性归位；气泡带同时淡入；
+// 推挤：气泡/通知撑高装饰带时，用高度差反推被顶开元素的旧位置，同样弹性滑回。
+const MOTION_DURATION = 420;
+const MOTION_EASING = "cubic-bezier(0.34, 1.28, 0.4, 1)"; // 末端轻微回弹
+let swapStartTops: [HTMLElement, number][] = [];
+
+const swapElements = () =>
+  [decorBand.value, avatarContainer.value, chatContainer.value].filter(
+    (el): el is HTMLElement => el !== null,
+  );
+
+// 从“旧位置”（相对当前布局偏移 dy）弹性滑回；fade 用于气泡带换位时的浮现
+const animateFrom = (el: HTMLElement, dy: number, fade = false) => {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || Math.abs(dy) < 1) return;
+  // 上一段动效直接归位，避免两次位移叠加
+  el.getAnimations().forEach((anim) => anim.finish());
+  el.animate(
+    [
+      { transform: `translateY(${dy}px)`, opacity: fade ? 0.25 : 1 },
+      { transform: "translateY(0)", opacity: 1 },
+    ],
+    { duration: MOTION_DURATION, easing: MOTION_EASING },
+  );
+};
+
+const captureSwapStart = () => {
+  swapStartTops = swapElements().map((el) => {
+    el.getAnimations().forEach((anim) => anim.finish());
+    return [el, el.getBoundingClientRect().top];
+  });
+};
+
+const playSwap = () => {
+  for (const [el, startTop] of swapStartTops) {
+    animateFrom(el, startTop - el.getBoundingClientRect().top, el === decorBand.value);
+  }
+  swapStartTops = [];
+};
+
+// 气泡上/下切换（拖拽进出屏幕上半区、设置里改选项）时播放换位动效
+watch(bubbleBelow, async () => {
+  captureSwapStart();
+  await nextTick();
+  playSwap();
+});
+
+// 气泡/通知出现、消失、改高会立刻把下方内容顶开 → 观察装饰带高度，把被顶开的元素弹性推回
+let bandHeight: number | null = null;
+const bandObserver = new ResizeObserver(() => {
+  const band = decorBand.value;
+  if (!band) return;
+  const rect = band.getBoundingClientRect();
+  const dy = bandHeight === null ? 0 : rect.height - bandHeight;
+  bandHeight = rect.height;
+  if (!dy) return;
+  for (const el of swapElements()) {
+    // 带子自身是“原地长高”，不位移；只有排在它下方被顶开的元素才回弹
+    if (el !== band && el.getBoundingClientRect().top > rect.top) animateFrom(el, -dy);
+  }
+});
+
 // 气泡当前是否有内容（显隐与点击穿透上报共用）
 const bubbleVisible = computed(
   () => gameStore.currentStatus === "responding" && gameStore.currentLine.trim() !== "",
@@ -217,6 +282,9 @@ onMounted(async () => {
   movedUnlisten = await appWindow.onMoved(scheduleAutoBubbleSide);
   await refreshAutoBubbleSide();
 
+  // 气泡/通知撑高装饰带时，把被顶开的内容弹性推回（见 bandObserver）
+  if (decorBand.value) bandObserver.observe(decorBand.value);
+
   // 设置透明背景的 body 属性样式（额外防护）
   document.body.style.backgroundColor = "transparent";
   document.documentElement.style.backgroundColor = "transparent";
@@ -301,6 +369,7 @@ onUnmounted(() => {
   if (bubbleSideUnlisten) bubbleSideUnlisten();
   if (movedUnlisten) movedUnlisten();
   if (autoSideTimer !== undefined) window.clearTimeout(autoSideTimer);
+  bandObserver.disconnect();
 
   if (hitTestInterval !== undefined) {
     window.clearInterval(hitTestInterval);
