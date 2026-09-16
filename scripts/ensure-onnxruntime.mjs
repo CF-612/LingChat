@@ -53,5 +53,7 @@ for (const dir of TARGET_DIRS) {
   }
 }
 if (!copied) {
-  console.log("[onnx] 未找到 target/{debug,release} 目录，跳过复制（构建时将由 tauri 打包 resources 处理）");
+  console.log(
+    "[onnx] 未找到 target/{debug,release} 目录，跳过复制（构建时将由 tauri 打包 resources 处理）",
+  );
 }
