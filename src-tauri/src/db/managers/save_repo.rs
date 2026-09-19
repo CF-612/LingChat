@@ -119,6 +119,7 @@ impl SaveRepo {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn update_save_last_message(
         db: &DatabaseConnection,
         save_id: i32,
@@ -295,12 +296,17 @@ impl SaveRepo {
             // Try ID match first
             if let Some(input_id) = input_line.base.id {
                 if input_id == db_line.id {
-                    // Same ID — update if content changed
+                    // Same ID — update if any persisted field changed
                     if db_line.content != input_line.base.content
                         || db_line.attribute != input_line.base.attribute.0
                         || db_line.sender_role_id != input_line.base.sender_role_id
+                        || db_line.original_emotion != input_line.base.original_emotion
+                        || db_line.predicted_emotion != input_line.base.predicted_emotion
+                        || db_line.tts_content != input_line.base.tts_content
+                        || db_line.audio_file != input_line.base.audio_file
                         || db_line.thinking != input_line.base.thinking
                         || db_line.action_content != input_line.base.action_content
+                        || db_line.display_name != input_line.base.display_name
                         || db_line.tool_call != input_line.base.tool_call
                     {
                         let mut active: line::ActiveModel = db_line.clone().into();
@@ -315,18 +321,24 @@ impl SaveRepo {
                         active.thinking = Set(input_line.base.thinking.clone());
                         active.display_name = Set(input_line.base.display_name.clone());
                         active.tool_call = Set(input_line.base.tool_call.clone());
-                        active.update(db).await.map_err(|e| anyhow!("{e}"))?;
                     }
                     continue;
                 }
             }
 
-            // Try weak match by content + attribute + sender + action_content + tool_call
+            // Try weak match using every persisted field except generated IDs.
             if db_line.content == input_line.base.content
+                && db_line.original_emotion == input_line.base.original_emotion
+                && db_line.predicted_emotion == input_line.base.predicted_emotion
+                && db_line.tts_content == input_line.base.tts_content
                 && db_line.attribute == input_line.base.attribute.0
                 && db_line.sender_role_id == input_line.base.sender_role_id
+                && db_line.audio_file == input_line.base.audio_file
+                && db_line.thinking == input_line.base.thinking
+                && db_line.display_name == input_line.base.display_name
                 && db_line.action_content == input_line.base.action_content
                 && db_line.tool_call == input_line.base.tool_call
+                && db_line.save_id == save_id
             {
                 // Same logical line — no update needed for existing DB row
                 continue;
@@ -337,6 +349,22 @@ impl SaveRepo {
             break;
         }
 
+        // 安全网：输入与 DB 链在首行即分歧（diverge=0）且双方都非空时，
+        // 说明输入不是"同一段对话的演进"（正常续写/回溯/语音回填首行都会匹配），
+        // 而是把另一段对话（如跨角色残留、错位回溯）误当成当前存档内容——
+        // 若继续会让下面 diverge.. 删除把整个存档历史抹空。拒绝覆盖以保护存档。
+        if diverge == 0 && !db_lines.is_empty() && !input_lines.is_empty() {
+            return Err(anyhow!(
+                "sync_lines 安全保护：输入与存档无共同锚点，拒绝全量覆盖（save_id={save_id}，db_lines={}，input_lines={}）",
+                db_lines.len(),
+                input_lines.len()
+            ));
+        }
+
+        // Keep line rows, perceptions, and the save tail pointer consistent if
+        // the process is interrupted or any individual write fails.
+        let txn = db.begin().await.map_err(|e| anyhow!("{e}"))?;
+
         // 3. Delete stale DB lines and their perceptions
         let stale_lines = &db_lines[diverge..];
         if !stale_lines.is_empty() {
@@ -344,15 +372,49 @@ impl SaveRepo {
 
             line_perception::Entity::delete_many()
                 .filter(line_perception::Column::LineId.is_in(stale_ids.clone()))
-                .exec(db)
+                .exec(&txn)
                 .await
                 .map_err(|e| anyhow!("{e}"))?;
 
             line::Entity::delete_many()
                 .filter(line::Column::Id.is_in(stale_ids))
-                .exec(db)
+                .exec(&txn)
                 .await
                 .map_err(|e| anyhow!("{e}"))?;
+        }
+
+        // Updates for matching IDs belong to the same transaction as the
+        // divergence replacement below.
+        for i in 0..diverge {
+            let db_line = &db_lines[i];
+            let input_line = &input_lines[i];
+            if input_line.base.id == Some(db_line.id)
+                && (db_line.content != input_line.base.content
+                    || db_line.attribute != input_line.base.attribute.0
+                    || db_line.sender_role_id != input_line.base.sender_role_id
+                    || db_line.original_emotion != input_line.base.original_emotion
+                    || db_line.predicted_emotion != input_line.base.predicted_emotion
+                    || db_line.tts_content != input_line.base.tts_content
+                    || db_line.audio_file != input_line.base.audio_file
+                    || db_line.thinking != input_line.base.thinking
+                    || db_line.action_content != input_line.base.action_content
+                    || db_line.display_name != input_line.base.display_name
+                    || db_line.tool_call != input_line.base.tool_call)
+            {
+                let mut active: line::ActiveModel = db_line.clone().into();
+                active.content = Set(input_line.base.content.clone());
+                active.attribute = Set(input_line.base.attribute.0.clone());
+                active.sender_role_id = Set(input_line.base.sender_role_id);
+                active.original_emotion = Set(input_line.base.original_emotion.clone());
+                active.predicted_emotion = Set(input_line.base.predicted_emotion.clone());
+                active.tts_content = Set(input_line.base.tts_content.clone());
+                active.action_content = Set(input_line.base.action_content.clone());
+                active.audio_file = Set(input_line.base.audio_file.clone());
+                active.thinking = Set(input_line.base.thinking.clone());
+                active.display_name = Set(input_line.base.display_name.clone());
+                active.tool_call = Set(input_line.base.tool_call.clone());
+                active.update(&txn).await.map_err(|e| anyhow!("{e}"))?;
+            }
         }
 
         // 4. Insert new input lines after divergence point
@@ -383,7 +445,7 @@ impl SaveRepo {
                     ..Default::default()
                 };
 
-                let inserted = new_line.insert(db).await.map_err(|e| anyhow!("{e}"))?;
+                let inserted = new_line.insert(&txn).await.map_err(|e| anyhow!("{e}"))?;
                 let new_id = inserted.id;
 
                 // Insert line_perception rows
@@ -392,7 +454,7 @@ impl SaveRepo {
                         line_id: Set(new_id),
                         role_id: Set(role_id),
                     };
-                    perception.insert(db).await.map_err(|e| anyhow!("{e}"))?;
+                    perception.insert(&txn).await.map_err(|e| anyhow!("{e}"))?;
                 }
 
                 parent_id = Some(new_id);
@@ -409,7 +471,17 @@ impl SaveRepo {
         } else {
             None
         };
-        Self::update_save_last_message(db, save_id, last_id).await?;
+        let save_model = save::Entity::find_by_id(save_id)
+            .one(&txn)
+            .await
+            .map_err(|e| anyhow!("{e}"))?
+            .context("Save not found")?;
+        let mut active: save::ActiveModel = save_model.into();
+        active.last_message_id = Set(last_id);
+        active.update_date = Set(Utc::now().naive_utc());
+        active.update(&txn).await.map_err(|e| anyhow!("{e}"))?;
+
+        txn.commit().await.map_err(|e| anyhow!("{e}"))?;
 
         Ok(())
     }
@@ -533,6 +605,19 @@ impl SaveRepo {
             .exec(db)
             .await
             .map_err(|e| anyhow!("{e}"))?;
+        Ok(())
+    }
+
+    /// 清除存档关联的剧本进度行。存档时若当前无剧本在跑，必须清掉该存档
+    /// 早年关联的旧行，否则读档会把一个早已结束的剧本误续跑起来。
+    pub async fn clear_running_script(db: &DatabaseConnection, save_id: i32) -> Result<()> {
+        let save_model = Self::get_save_by_id(db, save_id)
+            .await?
+            .context("Save not found")?;
+        if let Some(rs_id) = save_model.running_script_id {
+            Self::update_save_running_script(db, save_id, None).await?;
+            Self::delete_running_script(db, rs_id).await?;
+        }
         Ok(())
     }
 }

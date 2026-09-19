@@ -6,6 +6,7 @@ export default {
     other: "其他高级设置",
     tts: "TTS 设置",
     asr: "语音识别",
+    cast: "投屏设置",
   },
   menu: {
     llmTitle: "大模型管理",
@@ -29,5 +30,11 @@ export default {
     guideTitle: "内置 TTS 教程",
     guideDesc: "查看内置 TTS 使用教程（下载模型、导入语音、切换设备等）",
     guideButton: "打开教程页面",
+    castTitle: "投屏设置",
+    castDesc: "将游戏画面串流到局域网设备，配置端口、分辨率与画面调参",
+    castButton: "进入投屏设置界面",
+    memoryTitle: "永久记忆调试",
+    memoryDesc: "查看角色当前的记忆库内容与真实上下文，用于排查记忆压缩与注入问题",
+    memoryButton: "进入记忆调试界面",
   },
 };
