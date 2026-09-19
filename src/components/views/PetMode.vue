@@ -112,7 +112,12 @@
   import DragArea from "../pet/DragArea.vue";
   import GameRolesStage from "../pet/GameRolesStage.vue";
   import PetNotification from "../pet/PetNotification.vue";
-  import { BASE_AVATAR_SIZE, CHAT_BASE_H, DIALOG_MAX_BASE } from "../pet/constants";
+  import {
+    AVATAR_BAND_BASE,
+    CHAT_BASE_H,
+    DIALOG_MAX_BASE,
+    PET_WIDTH_BASE,
+  } from "../pet/constants";
 
   const { t } = useI18n();
   const router = useRouter();
@@ -135,14 +140,14 @@
       "--pet-ui-scale": scale.toString(),
       "--app-width": `${layout.width}px`,
       "--app-height": `${layout.height}px`,
-      "--avatar-size": `${Math.round(BASE_AVATAR_SIZE * scale)}px`,
+      "--avatar-size": `${Math.round(AVATAR_BAND_BASE * scale)}px`,
       "--chat-h": `${Math.round(CHAT_BASE_H * scale)}px`,
       "--dialog-h": `${Math.round(DIALOG_MAX_BASE * scale)}px`,
     };
   });
 
   const calcWindowLayout = (scale: number): { width: number; height: number } => {
-    const S = Math.round(BASE_AVATAR_SIZE * scale);
+    const S = Math.round(PET_WIDTH_BASE * scale);
     const chatH = Math.round(CHAT_BASE_H * scale);
     const dialogH = Math.round(DIALOG_MAX_BASE * scale);
     return { width: S, height: S + dialogH + chatH };

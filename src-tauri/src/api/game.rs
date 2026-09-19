@@ -18,7 +18,6 @@ use crate::ai_service::types::{
 use crate::config::{self, AppConfig};
 use crate::db::entities::line;
 use crate::db::entities::line::LineAttribute;
-use crate::db::managers::role_repo::RoleRepo;
 use crate::utils::prompt::{PromptOptions, PromptRole, sys_prompt_builder_by_settings};
 
 // ========== 响应类型 ==========
@@ -49,6 +48,8 @@ pub struct WebInitData {
     pub last_bgm_mode: Option<String>,
     /// 上次环境音轨道（JSON 字符串，前端解析）
     pub last_ambient_tracks: Option<String>,
+    /// 当前活跃剧本名（读档/进入剧本模式时非空），供前端还原剧本模式 UI
+    pub active_script: Option<String>,
 }
 
 /// 精简的角色设定，匹配前端 `CharacterSettings` 接口
@@ -322,21 +323,8 @@ pub async fn init_game(app: AppHandle) -> Result<WebInitData, String> {
 
 #[tauri::command]
 pub async fn select_character(app: AppHandle, character_id: i32) -> Result<WebInitData, String> {
-    let data_dir = crate::api::data_dir();
-
     // 1. 从 DB 加载角色设定
     let state = app.state::<AppState>();
-    let db = &state.db;
-
-    let settings = RoleRepo::get_role_settings_by_id(db, &data_dir, character_id)
-        .await
-        .map_err(|e| format!("查询角色配置失败: {}", e))?
-        .unwrap_or_else(|| {
-            tracing::warn!("角色 {} 无配置文件，使用默认设定", character_id);
-            let mut s = CharacterSettings::default();
-            s.character_id = Some(character_id);
-            s
-        });
 
     // 2. 读取 AppConfig 构建 PromptOptions
     let app_config = AppConfig::load(&app).unwrap_or_default();
@@ -349,10 +337,7 @@ pub async fn select_character(app: AppHandle, character_id: i32) -> Result<WebIn
     {
         let mut service = state.ai_service.lock().await;
         service
-            .import_settings(settings.clone(), prompt_options)
-            .await;
-        service
-            .init_game_status()
+            .init_game_status(Some(character_id), prompt_options)
             .await
             .map_err(|e| format!("初始化游戏状态失败: {}", e))?;
     }
@@ -366,11 +351,7 @@ pub async fn select_character(app: AppHandle, character_id: i32) -> Result<WebIn
         let _ = store.save();
     }
 
-    tracing::info!(
-        "切换角色成功: id={}, name={}",
-        character_id,
-        settings.ai_name
-    );
+    tracing::info!("切换角色成功: id={}", character_id,);
 
     // 5. 返回最新游戏状态（复用 init_game 逻辑）
     //    drop 后再拿锁，避免同一个锁两次借用
@@ -383,7 +364,7 @@ pub async fn select_character(app: AppHandle, character_id: i32) -> Result<WebIn
 
 // ========== 清除对话 ==========
 
-/// 清除当前角色的全部对话历史，复用 `init_game_status` 逻辑，
+/// 清除当前角色的全部对话历史。
 /// 保留角色设定、场景、背景音乐等配置。
 #[tauri::command]
 pub async fn clear_conversation(app: AppHandle) -> Result<WebInitData, String> {
@@ -396,7 +377,7 @@ pub async fn clear_conversation(app: AppHandle) -> Result<WebInitData, String> {
     {
         let mut service = state.ai_service.lock().await;
         service
-            .init_game_status()
+            .reset_game_status()
             .await
             .map_err(|e| format!("重置对话失败: {}", e))?;
     }
@@ -430,13 +411,19 @@ pub(crate) async fn build_web_init_data(
     service: &crate::ai_service::service::AIService,
     app: &AppHandle,
 ) -> Result<WebInitData, String> {
-    // 钦灵：旧版的 CharacterSettings 已经废弃，这一段代码之后可以精简一下。
-    let settings = service
-        .settings
-        .as_ref()
-        .ok_or_else(|| "AI 服务尚未初始化角色设定".to_string())?;
-
-    let character_settings = CharacterSettingsInit::from(settings);
+    let character_settings = {
+        let cid = service.init_character_id;
+        let cid = match cid {
+            Some(v) => v,
+            None => 0,
+        };
+        CharacterSettingsInit::from(
+            &service
+                .get_role_settings_by_id(cid)
+                .await
+                .map_err(|e| format!("获取角色设定失败: {}", e))?,
+        )
+    };
 
     let (
         lines,
@@ -448,6 +435,7 @@ pub(crate) async fn build_web_init_data(
         background_effect,
         background_music,
         scene_awareness_enabled,
+        active_script,
     ) = {
         let mut gs = service.game_status.lock().await;
         let seqs = compute_user_message_seqs(&gs.line_list);
@@ -531,6 +519,9 @@ pub(crate) async fn build_web_init_data(
             })
             .collect();
 
+        // 剧本模式名（启动时 script_status 恒为 None，不影响 init_game 路径）
+        let active_script = gs.script_status.as_ref().map(|s| s.name.clone());
+
         (
             lines,
             sid,
@@ -541,6 +532,7 @@ pub(crate) async fn build_web_init_data(
             gs.background_effect.clone(),
             gs.background_music.clone(),
             scene_awareness,
+            active_script,
         )
     };
 
@@ -595,6 +587,7 @@ pub(crate) async fn build_web_init_data(
         last_bgm_paused,
         last_bgm_mode,
         last_ambient_tracks,
+        active_script,
     };
     Ok(result)
 }
@@ -825,12 +818,11 @@ pub async fn notify_player_entry(app: AppHandle) -> Result<(), String> {
         let svc = state.ai_service.lock().await;
         let mut gs = svc.game_status.lock().await;
 
-        if gs.player_entered {
-            // 已问候过，通知前端无需再等待问候完成
+        if gs.entry_greeting_done {
             let _ = app.emit("entry:greeting-done", ());
             return Ok(());
         }
-        gs.player_entered = true;
+        gs.entry_greeting_done = true;
 
         let current_role_id = match gs.current_role_id {
             Some(id) => id,
@@ -910,19 +902,19 @@ pub async fn notify_player_entry(app: AppHandle) -> Result<(), String> {
         suppress_thinking: true,
         generation: preview_generation,
         is_preview: false,
+        transient_image: None,
     };
 
     let generator = MessageGenerator::new(deps);
     let gen_lock = state.generation_lock.clone();
-
     let app_for_emit = app.clone();
+
     tokio::spawn(async move {
         let _lock = gen_lock.lock().await;
         match generator.process_message(None).await {
             Ok(acc) => tracing::info!("[Entry] 入场问候生成完成，长度: {}", acc.len()),
             Err(e) => tracing::error!("[Entry] 入场问候生成失败: {:#}", e),
         }
-        // 通知前端：入场问候已处理完成（供桌宠 loading 等待问候结束）
         let _ = app_for_emit.emit("entry:greeting-done", ());
     });
 
