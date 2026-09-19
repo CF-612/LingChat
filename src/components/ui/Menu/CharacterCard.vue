@@ -182,7 +182,10 @@
               <span class="h-4 w-1 rounded-full bg-indigo-500"></span>
               {{ $t("ui.characterCard.outfits") }}
             </h3>
-            <div v-if="clothes?.length" class="flex snap-x gap-4 overflow-x-auto pb-2">
+            <div
+              v-if="clothes?.length"
+              class="clothes-scroll flex snap-x gap-4 overflow-x-auto pb-2"
+            >
               <div
                 v-for="cloth in clothes"
                 :key="cloth.title"
@@ -245,6 +248,7 @@
   } from "@/api/services/character";
   import { useGameStore } from "@/stores/modules/game";
   import { applyWebInitData } from "@/stores/modules/game/actions";
+  import { eventQueue } from "@/core/events/event-queue";
   import { useDialogStore } from "@/stores/modules/ui/dialog";
   import { Settings, Star } from "lucide-vue-next";
   import { Cat, Check } from "lucide-vue-next";
@@ -301,6 +305,9 @@
     try {
       const data = await selectCharacterApi(props.id);
       applyWebInitData(gameStore.$state, data);
+      // 切换角色后丢弃旧角色残留事件，避免旧回复串入新角色对话。
+      eventQueue.clear();
+      eventQueue.resume();
     } catch (error) {
       console.error("切换角色失败:", error);
     }
@@ -383,5 +390,27 @@
   .overflow-x-auto::-webkit-scrollbar,
   .overflow-y-auto::-webkit-scrollbar {
     display: none;
+  }
+
+  /* 服装横向列表保留可见滚动条，方便拖动查看后续服装。 */
+  .clothes-scroll {
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(129, 140, 248, 0.55) rgba(255, 255, 255, 0.06);
+  }
+  .clothes-scroll::-webkit-scrollbar {
+    display: block;
+    height: 8px;
+  }
+  .clothes-scroll::-webkit-scrollbar-track {
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .clothes-scroll::-webkit-scrollbar-thumb {
+    border-radius: 20px;
+    background-color: rgba(129, 140, 248, 0.55);
+  }
+  .clothes-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(129, 140, 248, 0.8);
   }
 </style>
