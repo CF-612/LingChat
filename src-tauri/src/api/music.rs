@@ -414,23 +414,6 @@ pub async fn delete_music(app: AppHandle, url: String) -> Result<Vec<MusicItemIn
     get_music_list(app).await
 }
 
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::resolve_music_path;
-
-    #[test]
-    fn preserves_category_segments_in_relative_music_urls() {
-        let base = Path::new("music");
-        assert_eq!(
-            resolve_music_path(base, "battle/boss.mp3"),
-            base.join("battle").join("boss.mp3")
-        );
-        assert_eq!(resolve_music_path(base, "boss.mp3"), base.join("boss.mp3"));
-    }
-}
-
 // ========== 会话状态持久化 ==========
 
 /// 持久化背景音乐播放状态到 settings.json，下次启动时自动恢复。

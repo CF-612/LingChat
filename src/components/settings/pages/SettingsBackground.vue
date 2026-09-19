@@ -234,7 +234,7 @@
         <button
           class="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-white/80
             transition-colors hover:bg-white/10"
-          @click="handleMoveScene(sceneMenu.scene, '根目录')"
+          @click="handleMoveScene(sceneMenu.scene, null)"
         >
           {{ $t("settings.background.scene.moveToRoot") }}
         </button>
@@ -997,7 +997,13 @@
     if (!currentBackgroundCategory.value || currentBackgroundCategory.value === "全部") {
       return orderedScenes.value;
     }
+    if (currentBackgroundCategory.value === VIRTUAL_CATEGORY) {
+      return orderedScenes.value.filter(
+        (scene) => scene.plugin_id || (scene.source && scene.source !== "game"),
+      );
+    }
     return orderedScenes.value.filter((s) => {
+      if (s.plugin_id || (s.source && s.source !== "game")) return false;
       const bgPath = s.background || "";
       return categoryOfBackground(bgPath) === currentBackgroundCategory.value;
     });
@@ -1493,7 +1499,7 @@
   }
 
   // 把场景的背景图片移动到目标子分类（子文件夹）
-  async function handleMoveScene(scene: SceneInfo, category: string): Promise<void> {
+  async function handleMoveScene(scene: SceneInfo, category: string | null): Promise<void> {
     closeSceneContextMenu();
     if (!scene.background) {
       await dialogStore.alert(t("settings.background.scene.moveNoBackground"));
@@ -1505,7 +1511,10 @@
       await fetchScenes();
       uiStore.showSuccess({
         title: t("settings.background.scene.movedTitle"),
-        message: t("settings.background.scene.movedMsg", { name: scene.scene_name, category }),
+        message: t("settings.background.scene.movedMsg", {
+          name: scene.scene_name,
+          category: category ?? t("settings.background.scene.moveToRoot"),
+        }),
         duration: 3000,
       });
     } catch (e: any) {

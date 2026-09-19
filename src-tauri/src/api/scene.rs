@@ -20,8 +20,8 @@ pub struct SceneInfo {
     pub scene_name: String,
     pub scene_description: String,
     pub background: Option<String>,
-    /// 场景所属子分类（背景子文件夹名；根目录为“根目录”）
-    pub category: String,
+    /// 场景所属子分类；None 表示背景位于根目录或未设置分类。
+    pub category: Option<String>,
     pub lighting: Option<LightingParams>,
     pub created_at: String,
     pub updated_at: String,
@@ -92,13 +92,12 @@ fn relative_key(raw: &str) -> String {
         .to_lowercase()
 }
 
-fn category_from_storage_path(raw: &str) -> String {
+fn category_from_storage_path(raw: &str) -> Option<String> {
     Path::new(raw)
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .and_then(|parent| parent.file_name())
         .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "根目录".to_string())
 }
 
 #[derive(Default)]
@@ -128,7 +127,7 @@ impl BackgroundIndex {
         index
     }
 
-    fn resolve(&self, raw: &str, category: &str) -> Result<Option<PathBuf>, String> {
+    fn resolve(&self, raw: &str, category: Option<&str>) -> Result<Option<PathBuf>, String> {
         if raw.trim().is_empty() {
             return Ok(None);
         }
@@ -150,10 +149,9 @@ impl BackgroundIndex {
         if file_name.is_empty() {
             return Ok(None);
         }
-        let category_key = if category.is_empty() || category == "根目录" {
-            relative_key(&file_name)
-        } else {
-            relative_key(&format!("{category}/{file_name}"))
+        let category_key = match category.filter(|category| !category.is_empty()) {
+            Some(category) => relative_key(&format!("{category}/{file_name}")),
+            None => relative_key(&file_name),
         };
         if let Some(path) = self.by_relative.get(&category_key) {
             return Ok(Some(path.clone()));
@@ -170,7 +168,7 @@ impl BackgroundIndex {
 }
 
 fn model_to_info_with_background_index(scene: &Scene, index: &BackgroundIndex) -> SceneInfo {
-    let background = match index.resolve(&scene.background, &scene.category) {
+    let background = match index.resolve(&scene.background, scene.category.as_deref()) {
         Ok(Some(path)) => Some(path.to_string_lossy().into_owned()),
         Ok(None) => None,
         Err(error) => {
@@ -213,7 +211,7 @@ fn stored_background_from_input(
         return Ok(String::new());
     }
     let path = index
-        .resolve(raw, "根目录")?
+        .resolve(raw, None)?
         .ok_or_else(|| format!("找不到背景文件: {}", to_background_filename(raw)))?;
     validate_path_in_base(&path, bg_base)?;
     relative_storage_path(&path, bg_base).ok_or_else(|| "背景路径不在背景目录内".to_string())
@@ -223,7 +221,7 @@ fn migrate_scene_background(scene: &mut Scene, bg_base: &Path, index: &Backgroun
     if scene.plugin_id.is_some() || scene.background.trim().is_empty() {
         return false;
     }
-    let Ok(Some(path)) = index.resolve(&scene.background, &scene.category) else {
+    let Ok(Some(path)) = index.resolve(&scene.background, scene.category.as_deref()) else {
         return false;
     };
     let Some(relative) = relative_storage_path(&path, bg_base) else {
@@ -240,7 +238,7 @@ fn migrate_scene_background(scene: &mut Scene, bg_base: &Path, index: &Backgroun
 pub(crate) fn normalize_background(raw: &str) -> String {
     let bg_base = super::backgrounds_dir();
     let (_, index) = scan_backgrounds(&bg_base);
-    match index.resolve(raw, "根目录") {
+    match index.resolve(raw, None) {
         Ok(Some(path)) => path.to_string_lossy().into_owned(),
         _ => String::new(),
     }
@@ -267,8 +265,8 @@ mod tests {
         let sub = base.join("古风").join("room.png");
         let index = BackgroundIndex::build(&base, &[root.clone(), sub.clone()]);
 
-        assert_eq!(index.resolve("room.png", "根目录").unwrap(), Some(root));
-        assert_eq!(index.resolve("room.png", "古风").unwrap(), Some(sub));
+        assert_eq!(index.resolve("room.png", None).unwrap(), Some(root));
+        assert_eq!(index.resolve("room.png", Some("古风")).unwrap(), Some(sub));
     }
 
     #[test]
@@ -278,7 +276,7 @@ mod tests {
         let sub = base.join("古风").join("room.png");
         let index = BackgroundIndex::build(&base, &[root, sub.clone()]);
 
-        assert_eq!(index.resolve("古风/room.png", "根目录").unwrap(), Some(sub));
+        assert_eq!(index.resolve("古风/room.png", None).unwrap(), Some(sub));
     }
 
     #[test]
@@ -288,7 +286,7 @@ mod tests {
         let second = base.join("现代").join("room.png");
         let index = BackgroundIndex::build(&base, &[first, second]);
 
-        assert!(index.resolve("room.png", "根目录").is_err());
+        assert!(index.resolve("room.png", None).is_err());
     }
 }
 
@@ -486,7 +484,7 @@ pub async fn clear_empty_scenes(app: AppHandle) -> Result<usize, String> {
         if scene.background.trim().is_empty() {
             return true;
         }
-        match background_index.resolve(&scene.background, &scene.category) {
+        match background_index.resolve(&scene.background, scene.category.as_deref()) {
             Ok(Some(_)) => true,
             Ok(None) => false,
             Err(_) => true,
@@ -516,9 +514,9 @@ pub async fn clear_empty_scenes(app: AppHandle) -> Result<usize, String> {
 
 /// 删除/迁移背景分类后同步 scenes.json。
 ///
-/// - `move_to_root`：把引用该分类下背景的相对路径改为纯文件名，category 设为「根目录」。
+/// - `move_to_root`：把引用该分类下背景的相对路径改为纯文件名，category 设为 None。
 /// - `delete_all`：删除后若背景还能解析到其他候选则更新为新的相对路径；
-///   若彻底丢失则清空背景（保留空背景场景）；歧义时保留场景并把 category 回「根目录」。
+///   若彻底丢失则清空背景（保留空背景场景）；歧义时保留场景并把 category 设为 None。
 pub(crate) fn sync_scenes_after_background_category_change(
     bg_base: &Path,
     category: &str,
@@ -541,7 +539,7 @@ pub(crate) fn sync_scenes_after_background_category_change(
                 continue;
             }
             scene.background = to_background_filename(&scene.background);
-            scene.category = "根目录".to_string();
+            scene.category = None;
             scene.updated_at = now_iso();
             dirty = true;
         }
@@ -554,7 +552,7 @@ pub(crate) fn sync_scenes_after_background_category_change(
             if !scene.background.starts_with(&prefix) {
                 continue;
             }
-            match remaining_index.resolve(&scene.background, &scene.category) {
+            match remaining_index.resolve(&scene.background, scene.category.as_deref()) {
                 Ok(Some(path)) => {
                     if let Some(relative) = relative_storage_path(&path, bg_base) {
                         let category = category_from_storage_path(&relative);
@@ -563,13 +561,13 @@ pub(crate) fn sync_scenes_after_background_category_change(
                     }
                 },
                 Err(_) => {
-                    // 歧义：保留场景与背景引用，但分类回「根目录」避免指向已删除分类。
-                    scene.category = "根目录".to_string();
+                    // 歧义：保留场景与背景引用，但清空分类，避免指向已删除分类。
+                    scene.category = None;
                 },
                 Ok(None) => {
                     // 背景文件已彻底丢失：保留空背景场景，但清空背景引用。
                     scene.background = String::new();
-                    scene.category = "根目录".to_string();
+                    scene.category = None;
                 },
             }
             scene.updated_at = now_iso();
@@ -588,13 +586,13 @@ pub(crate) fn sync_scenes_after_background_category_change(
 }
 
 /// 把某个场景的背景文件移动到目标子分类（子文件夹）。
-/// category 传「根目录」则移动到 backgrounds 根目录；否则移动到 backgrounds/<category>/ 下。
+/// category 传 None 则移动到 backgrounds 根目录；否则移动到 backgrounds/<category>/ 下。
 /// 同时更新场景的 category 与背景相对路径。
 #[tauri::command]
 pub async fn move_scene_to_category(
     _app: AppHandle,
     id: String,
-    category: String,
+    category: Option<String>,
 ) -> Result<SceneInfo, String> {
     let store = SceneStore::new(&data_dir());
     let mut scenes = store
@@ -606,17 +604,14 @@ pub async fn move_scene_to_category(
         .position(|s| s.id == id)
         .ok_or_else(|| format!("场景 {} 不存在", id))?;
 
-    let target = {
-        let t = category.trim();
-        if t.is_empty() || t == "根目录" {
-            "根目录".to_string()
-        } else {
-            let category = validate_directory_name(t)?;
-            if matches!(category.as_str(), "全部" | "插件") {
-                return Err("不能移动到保留分类".to_string());
-            }
-            category
+    let target = if let Some(t) = category.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        let category = validate_directory_name(t)?;
+        if matches!(category.as_str(), "全部" | "插件") {
+            return Err("不能移动到保留分类".to_string());
         }
+        Some(category)
+    } else {
+        None
     };
 
     let file_name = to_background_filename(&scenes[idx].background);
@@ -627,14 +622,13 @@ pub async fn move_scene_to_category(
     let bg_base = super::backgrounds_dir();
     let (_, background_index) = scan_backgrounds(&bg_base);
     let src = background_index
-        .resolve(&scenes[idx].background, &scenes[idx].category)?
+        .resolve(&scenes[idx].background, scenes[idx].category.as_deref())?
         .ok_or_else(|| format!("找不到背景文件: {file_name}"))?;
     validate_path_in_base(&src, &bg_base)?;
-    let dest_dir = if target == "根目录" {
-        bg_base.clone()
-    } else {
-        bg_base.join(&target)
-    };
+    let dest_dir = target
+        .as_deref()
+        .map(|category| bg_base.join(category))
+        .unwrap_or_else(|| bg_base.clone());
     std::fs::create_dir_all(&dest_dir).map_err(|e| format!("创建分类目录失败: {e}"))?;
     validate_path_in_base(&dest_dir, &bg_base)?;
     let dest = dest_dir.join(&file_name);
@@ -655,7 +649,8 @@ pub async fn move_scene_to_category(
         if scene.plugin_id.is_some() {
             continue;
         }
-        let Ok(Some(path)) = background_index.resolve(&scene.background, &scene.category) else {
+        let Ok(Some(path)) = background_index.resolve(&scene.background, scene.category.as_deref())
+        else {
             continue;
         };
         if path == src {
