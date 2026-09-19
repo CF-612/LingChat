@@ -10,17 +10,16 @@
 </template>
 
 <script setup lang="ts">
-  import { isMobile } from '@/utils/platform';
+import { isMobile } from '@/utils/platform';
+defineOptions({ inheritAttrs: false });
 
-  defineOptions({ inheritAttrs: false });
+interface Props {
+  mobile?: boolean;
+}
 
-  interface Props {
-    mobile?: boolean;
-  }
-
-  withDefaults(defineProps<Props>(), {
-    mobile: true,
-  });
+withDefaults(defineProps<Props>(), {
+  mobile: true,
+});
 </script>
 
 <style scoped>

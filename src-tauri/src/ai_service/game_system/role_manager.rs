@@ -6,7 +6,7 @@ use sea_orm::DatabaseConnection;
 
 use crate::ai_service::game_system::memory_builder::MemoryBuilder;
 use crate::ai_service::game_system::persistent_memory_system::{
-    MemorySectionLimits, PersistentMemorySystem,
+    MemorySectionLimits, MemorySystemSnapshot, PersistentMemorySystem,
 };
 use crate::ai_service::llm::LlmSlot;
 use crate::ai_service::tts::VoiceMaker;
@@ -16,12 +16,12 @@ use crate::config::tts::TtsConfig;
 use crate::db::entities::line::LineAttribute;
 use crate::db::managers::memory_repo::MemoryRepo;
 use crate::db::managers::role_repo::RoleRepo;
-use crate::utils::path::resolve_character_path;
 
 /// 角色运行时管理器：维护当前活跃角色的内存状态。
 pub struct GameRoleManager {
     pub loaded_roles: HashMap<i32, GameRole>,
     data_dir: PathBuf,
+    pub db: DatabaseConnection,
 
     /// LLM 客户端槽位（支持运行时热切换）。MemoryBank 压缩引擎依赖此字段。
     /// 槽位本身始终存在，内部值为 None 时表示尚未配置模型。
@@ -41,6 +41,9 @@ pub struct GameRoleManager {
     memory_recent_window: u32,
     /// 各记忆段长度上限（来自 `AppConfig::memory_*_max_chars`），透传给压缩系统。
     memory_limits: MemorySectionLimits,
+    /// 记忆窗口内没有 user 消息时，是否在裁切后的首条 assistant 前注入一条 user「继续」
+    /// （来自 `AppConfig::memory_inject_continue_user`）。
+    memory_inject_continue_user: bool,
     /// 角色服装覆盖（session store → register_role_by_id 时优先读取）
     clothes_overrides: HashMap<i32, String>,
 }
@@ -48,6 +51,7 @@ pub struct GameRoleManager {
 impl GameRoleManager {
     pub fn new(
         data_dir: PathBuf,
+        db: DatabaseConnection,
         llm: LlmSlot,
         tts_config: TtsConfig,
         local_tts: Option<LocalTtsRuntime>,
@@ -55,10 +59,12 @@ impl GameRoleManager {
         memory_update_interval: u32,
         memory_recent_window: u32,
         memory_limits: MemorySectionLimits,
+        memory_inject_continue_user: bool,
     ) -> Self {
         Self {
             loaded_roles: HashMap::new(),
             data_dir,
+            db,
             llm,
             memory_bank_systems: HashMap::new(),
             tts_config,
@@ -67,6 +73,7 @@ impl GameRoleManager {
             memory_update_interval,
             memory_recent_window,
             memory_limits,
+            memory_inject_continue_user,
             clothes_overrides: HashMap::new(),
         }
     }
@@ -142,10 +149,6 @@ impl GameRoleManager {
         let role_ids: Vec<i32> = self.loaded_roles.keys().copied().collect();
         let mut ok = 0usize;
         for role_id in role_ids {
-            let resource_path = self
-                .loaded_roles
-                .get(&role_id)
-                .and_then(|r| r.resource_path.clone());
             let settings =
                 match RoleRepo::get_role_settings_by_id(db, &self.data_dir, role_id).await {
                     Ok(Some(s)) => s,
@@ -154,7 +157,6 @@ impl GameRoleManager {
             let Some(vm) = build_voice_maker(
                 &self.data_dir,
                 &settings,
-                resource_path.as_deref(),
                 &self.tts_config,
                 self.local_tts.as_ref(),
             ) else {
@@ -195,7 +197,6 @@ impl GameRoleManager {
         let voice_maker = build_voice_maker(
             &self.data_dir,
             &settings,
-            resource_path.as_deref(),
             &self.tts_config,
             self.local_tts.as_ref(),
         );
@@ -344,7 +345,9 @@ impl GameRoleManager {
                 }
             }
 
-            let built = MemoryBuilder::new(rid).build(&final_sliced);
+            let built = MemoryBuilder::new(rid)
+                .with_continue_user(self.memory_inject_continue_user)
+                .build(&final_sliced);
 
             // 阶段 4: 写入角色记忆
             if let Some(role) = self.loaded_roles.get_mut(&rid) {
@@ -494,19 +497,14 @@ impl GameRoleManager {
         role_id: i32,
         settings: &CharacterSettings,
     ) -> bool {
-        let Some(resource_path) = self
-            .loaded_roles
-            .get(&role_id)
-            .map(|role| role.resource_path.clone())
-        else {
+        if !self.loaded_roles.contains_key(&role_id) {
             tracing::info!("角色 {} 尚未加载，TTS 设置将在下次加载时生效", role_id);
             return false;
-        };
+        }
 
         let voice_maker = build_voice_maker(
             &self.data_dir,
             settings,
-            resource_path.as_deref(),
             &self.tts_config,
             self.local_tts.as_ref(),
         );
@@ -673,103 +671,26 @@ impl GameRoleManager {
     pub fn memory_as_json(&self, role_id: i32) -> Option<Vec<LlmMessage>> {
         self.loaded_roles.get(&role_id).map(|r| r.memory.clone())
     }
-}
 
-#[cfg(test)]
-mod memory_bank_context_tests {
-    use super::GameRoleManager;
-    use crate::ai_service::game_system::persistent_memory_system::{
-        MemorySectionLimits, PersistentMemorySystem,
-    };
-    use crate::ai_service::llm::LlmSlot;
-    use crate::ai_service::types::{GameMemoryBank, LlmMessage};
-    use crate::config::tts::TtsConfig;
-    use std::path::PathBuf;
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
-
-    #[test]
-    fn invalidation_covers_systems_for_roles_no_longer_present_in_history() {
-        let llm: LlmSlot = Arc::new(RwLock::new(None));
-        let mut manager = GameRoleManager::new(
-            PathBuf::new(),
-            llm.clone(),
-            TtsConfig::default(),
-            None,
-            true,
-            250,
-            30,
-            MemorySectionLimits::default(),
-        );
-        for role_id in [1, 2] {
-            manager.memory_bank_systems.insert(
-                role_id,
-                PersistentMemorySystem::new(
-                    role_id,
-                    &GameMemoryBank::default(),
-                    llm.clone(),
-                    true,
-                    250,
-                    30,
-                    MemorySectionLimits::default(),
-                    "AI",
-                ),
-            );
-        }
-
-        manager.invalidate_memory_history();
-        assert!(
-            manager
-                .memory_bank_systems
-                .values()
-                .all(|system| system.history_revision_for_test() == 1)
-        );
+    /// 取某角色永久记忆运行时的**只读**快照（供前端的记忆调试页）。
+    ///
+    /// 返回 `None` 只表示"运行时不存在"：全局开关关闭时运行时**仍会创建**
+    /// （只是 `enabled == false`），因此那种情况返回 `Some`；运行时缺失通常
+    /// 是 LLM 槽位为空（`ensure_memory_bank_system` 会直接早退、不插入条目）。
+    pub async fn memory_debug(
+        &self,
+        role_id: i32,
+        lines: &[GameLine],
+    ) -> Option<MemorySystemSnapshot> {
+        let system = self.memory_bank_systems.get(&role_id)?;
+        Some(system.debug_snapshot(lines).await)
     }
 
-    #[test]
-    fn short_term_summary_is_prepended_to_the_first_user_message_once() {
-        let output = GameRoleManager::merge_memory_bank_into_context(
-            vec![LlmMessage::system("persona"), LlmMessage::user("hello")],
-            "\nMEMORY\n",
-            "【近期回顾】summary\n\n",
-        );
-        assert_eq!(output[0].role, "system");
-        assert!(output[0].content.contains("MEMORY"));
-        assert_eq!(output[1].role, "user");
-        assert_eq!(output[1].content, "【近期回顾】summary\n\nhello");
-        assert_eq!(output[1].content.matches("【近期回顾】summary").count(), 1);
-    }
-
-    #[test]
-    fn short_term_summary_is_inserted_before_an_earlier_assistant_block() {
-        let output = GameRoleManager::merge_memory_bank_into_context(
-            vec![
-                LlmMessage::system("persona"),
-                LlmMessage::assistant("older assistant"),
-                LlmMessage::user("later user"),
-            ],
-            "",
-            "【近期回顾】summary\n\n",
-        );
-        assert_eq!(output[0].role, "system");
-        assert_eq!(output[1], LlmMessage::user("【近期回顾】summary\n\n"));
-        assert_eq!(output[2].role, "assistant");
-        assert_eq!(output[3].content, "later user");
-    }
-
-    #[test]
-    fn short_term_summary_is_inserted_when_no_user_message_exists() {
-        let output = GameRoleManager::merge_memory_bank_into_context(
-            vec![
-                LlmMessage::system("persona"),
-                LlmMessage::assistant("hello"),
-            ],
-            "",
-            "【近期回顾】summary\n\n",
-        );
-        assert_eq!(output[0].role, "system");
-        assert_eq!(output[1], LlmMessage::user("【近期回顾】summary\n\n"));
-        assert_eq!(output[2].role, "assistant");
+    /// 运行时是否存在；存在时返回其 `enabled`。给列表用的廉价查询（不做快照）。
+    pub fn memory_runtime_enabled(&self, role_id: i32) -> Option<bool> {
+        self.memory_bank_systems
+            .get(&role_id)
+            .map(|s| s.is_enabled())
     }
 }
 
@@ -780,7 +701,6 @@ mod memory_bank_context_tests {
 fn build_voice_maker(
     data_dir: &Path,
     settings: &CharacterSettings,
-    resource_path: Option<&str>,
     tts_config: &TtsConfig,
     local_tts: Option<&LocalTtsRuntime>,
 ) -> Option<VoiceMaker> {
@@ -806,9 +726,6 @@ fn build_voice_maker(
     vm.set_local_runtime(local_tts.cloned());
     vm.set_lang(&lang);
     vm.set_voice_dialect(settings.voice_dialect.clone());
-    if let Some(p) = resource_path {
-        vm.set_character_path(Some(resolve_character_path(data_dir, p)));
-    }
     match vm.set_tts_settings(&voice_cfg, tts_type, &settings.ai_name) {
         Ok(()) => Some(vm),
         Err(e) => {
