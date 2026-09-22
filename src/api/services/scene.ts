@@ -87,9 +87,6 @@ export async function setSceneAwareness(enabled: boolean): Promise<void> {
  * 把场景的背景图片移动到指定子分类（子文件夹）下，并更新场景的分类。
  * `category` 传 null 表示移回背景根目录。
  */
-export async function moveSceneToCategory(
-  id: string,
-  category: string | null,
-): Promise<SceneInfo> {
+export async function moveSceneToCategory(id: string, category: string | null): Promise<SceneInfo> {
   return invoke<SceneInfo>("move_scene_to_category", { id, category });
 }

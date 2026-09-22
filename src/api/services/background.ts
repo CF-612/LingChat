@@ -9,7 +9,7 @@ export const getBackgroundImages = async (): Promise<BackgroundImageInfo[]> => {
   } catch (error: any) {
     console.error(
       "Failed to get background list:",
-      typeof error === "string" ? error : error.message
+      typeof error === "string" ? error : error.message,
     );
     throw error;
   }
@@ -22,7 +22,7 @@ export const getBackgroundImageById = async (id: string): Promise<BackgroundImag
 export const uploadBackgroundImage = async (
   fileName: string,
   fileData: Uint8Array,
-  category?: string
+  category?: string,
 ): Promise<BackgroundImageInfo[]> => {
   return invoke("upload_background_image", { fileName, fileData, category });
 };
@@ -54,7 +54,7 @@ export const listBackgroundCategories = async (): Promise<string[]> => {
   } catch (error: any) {
     console.error(
       "Failed to list background categories:",
-      typeof error === "string" ? error : error.message
+      typeof error === "string" ? error : error.message,
     );
     return [];
   }
@@ -73,7 +73,7 @@ export const createBackgroundCategory = async (name: string): Promise<void> => {
  */
 export const deleteBackgroundCategory = async (
   name: string,
-  mode: "move_to_root" | "delete_all"
+  mode: "move_to_root" | "delete_all",
 ): Promise<number> => {
   const data = await invoke<number>("delete_background_category", { name, mode });
   return data ?? 0;

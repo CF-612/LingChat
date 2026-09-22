@@ -22,7 +22,7 @@ export interface UploadMusicResult {
 export const musicUpload = async (
   path: string,
   fileName: string,
-  category?: string
+  category?: string,
 ): Promise<UploadMusicResult> => {
   try {
     return await invoke<UploadMusicResult>("upload_music", { path, fileName, category });
@@ -39,7 +39,7 @@ export const musicListCategories = async (): Promise<string[]> => {
   } catch (error: any) {
     console.error(
       "Failed to list music categories:",
-      typeof error === "string" ? error : error.message
+      typeof error === "string" ? error : error.message,
     );
     return [];
   }
